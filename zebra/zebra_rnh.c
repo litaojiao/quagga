@@ -789,6 +789,9 @@ send_client (struct rnh *rnh, struct zserv *client, rnh_type_t type)
       stream_putc (s, 0);
     }
   stream_putw_at (s, 0, stream_get_endp (s));
+
+  client->nh_last_upd_time = quagga_time(NULL);
+  client->last_write_cmd = cmd;
   return zebra_server_send_message(client);
 }
 
