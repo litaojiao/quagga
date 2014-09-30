@@ -2052,7 +2052,7 @@ rib_delnode (struct route_node *rn, struct rib *rib)
 }
 
 int
-rib_add_ipv4 (int type, int flags, struct prefix_ipv4 *p, 
+rib_add_ipv4 (int type, u_short instance, int flags, struct prefix_ipv4 *p,
 	      struct in_addr *gate, struct in_addr *src,
 	      unsigned int ifindex, u_int32_t vrf_id,
 	      u_int32_t metric, u_char distance, safi_t safi)
@@ -2096,6 +2096,8 @@ rib_add_ipv4 (int type, int flags, struct prefix_ipv4 *p,
       
       if (rib->type != type)
 	continue;
+      if (rib->instance != instance)
+	continue;
       if (rib->type != ZEBRA_ROUTE_CONNECT)
         {
           same = rib;
@@ -2115,6 +2117,7 @@ rib_add_ipv4 (int type, int flags, struct prefix_ipv4 *p,
   /* Allocate new rib structure. */
   rib = XCALLOC (MTYPE_RIB, sizeof (struct rib));
   rib->type = type;
+  rib->instance = instance;
   rib->distance = distance;
   rib->flags = flags;
   rib->metric = metric;
@@ -2172,11 +2175,12 @@ void _rib_dump (const char * func,
   zlog_debug ("%s: dumping RIB entry %p for %s/%d", func, rib, straddr, p->prefixlen);
   zlog_debug
   (
-    "%s: refcnt == %lu, uptime == %lu, type == %u, table == %d",
+    "%s: refcnt == %lu, uptime == %lu, type == %u, instance == %d, table == %d",
     func,
     rib->refcnt,
     (unsigned long) rib->uptime,
     rib->type,
+    rib->instance,
     rib->table
   );
   zlog_debug
@@ -2353,7 +2357,8 @@ rib_add_ipv4_multipath (struct prefix_ipv4 *p, struct rib *rib, safi_t safi)
       if (CHECK_FLAG (same->status, RIB_ENTRY_REMOVED))
         continue;
       
-      if (same->type == rib->type && same->table == rib->table
+      if (same->type == rib->type && same->instance == rib->instance
+          && same->table == rib->table
 	  && same->type != ZEBRA_ROUTE_CONNECT)
         break;
     }
@@ -2392,7 +2397,7 @@ rib_add_ipv4_multipath (struct prefix_ipv4 *p, struct rib *rib, safi_t safi)
 
 /* XXX factor with rib_delete_ipv6 */
 int
-rib_delete_ipv4 (int type, int flags, struct prefix_ipv4 *p,
+rib_delete_ipv4 (int type, u_short instance, int flags, struct prefix_ipv4 *p,
 		 struct in_addr *gate, unsigned int ifindex, u_int32_t vrf_id, safi_t safi)
 {
   struct route_table *table;
@@ -2459,6 +2464,8 @@ rib_delete_ipv4 (int type, int flags, struct prefix_ipv4 *p,
 	fib = rib;
 
       if (rib->type != type)
+	continue;
+      if (rib->instance != instance)
 	continue;
       if (rib->type == ZEBRA_ROUTE_CONNECT && (nexthop = rib->nexthop) &&
 	  nexthop->type == NEXTHOP_TYPE_IFINDEX)
@@ -2598,6 +2605,7 @@ static_install_ipv4 (struct prefix *p, struct static_ipv4 *si)
       rib = XCALLOC (MTYPE_RIB, sizeof (struct rib));
       
       rib->type = ZEBRA_ROUTE_STATIC;
+      rib->instance = 0;
       rib->distance = si->distance;
       rib->metric = 0;
       rib->table = zebrad.rtm_table_default;
@@ -2899,7 +2907,7 @@ rib_bogus_ipv6 (int type, struct prefix_ipv6 *p,
 }
 
 int
-rib_add_ipv6 (int type, int flags, struct prefix_ipv6 *p,
+rib_add_ipv6 (int type, u_short instance, int flags, struct prefix_ipv6 *p,
 	      struct in6_addr *gate, unsigned int ifindex, u_int32_t vrf_id,
 	      u_int32_t metric, u_char distance, safi_t safi)
 {
@@ -2940,6 +2948,8 @@ rib_add_ipv6 (int type, int flags, struct prefix_ipv6 *p,
 
       if (rib->type != type)
 	continue;
+      if (rib->instance != instance)
+	continue;
       if (rib->type != ZEBRA_ROUTE_CONNECT)
 	{
 	  same = rib;
@@ -2958,6 +2968,7 @@ rib_add_ipv6 (int type, int flags, struct prefix_ipv6 *p,
   rib = XCALLOC (MTYPE_RIB, sizeof (struct rib));
   
   rib->type = type;
+  rib->instance = instance;
   rib->distance = distance;
   rib->flags = flags;
   rib->metric = metric;
@@ -3052,6 +3063,10 @@ rib_add_ipv6_multipath (struct prefix_ipv6 *p, struct rib *rib, safi_t safi,
        continue;
      }
 
+     if (same->instance != rib->instance) {
+       continue;
+     }
+
      if (same->table != rib->table) {
        continue;
      }
@@ -3095,7 +3110,7 @@ rib_add_ipv6_multipath (struct prefix_ipv6 *p, struct rib *rib, safi_t safi,
 
 /* XXX factor with rib_delete_ipv6 */
 int
-rib_delete_ipv6 (int type, int flags, struct prefix_ipv6 *p,
+rib_delete_ipv6 (int type, u_short instance, int flags, struct prefix_ipv6 *p,
 		 struct in6_addr *gate, unsigned int ifindex, u_int32_t vrf_id, safi_t safi)
 {
   struct route_table *table;
@@ -3147,6 +3162,8 @@ rib_delete_ipv6 (int type, int flags, struct prefix_ipv6 *p,
 	fib = rib;
 
       if (rib->type != type)
+        continue;
+      if (rib->instance != instance)
         continue;
       if (rib->type == ZEBRA_ROUTE_CONNECT && (nexthop = rib->nexthop) &&
 	  nexthop->type == NEXTHOP_TYPE_IFINDEX)
@@ -3288,6 +3305,7 @@ static_install_ipv6 (struct prefix *p, struct static_ipv6 *si)
       rib = XCALLOC (MTYPE_RIB, sizeof (struct rib));
       
       rib->type = ZEBRA_ROUTE_STATIC;
+      rib->instance = 0;
       rib->distance = si->distance;
       rib->metric = 0;
       rib->table = zebrad.rtm_table_default;
@@ -3639,7 +3657,7 @@ rib_sweep_route (void)
 
 /* Remove specific by protocol routes from 'table'. */
 static unsigned long
-rib_score_proto_table (u_char proto, struct route_table *table)
+rib_score_proto_table (u_char proto, u_short instance, struct route_table *table)
 {
   struct route_node *rn;
   struct rib *rib;
@@ -3652,7 +3670,7 @@ rib_score_proto_table (u_char proto, struct route_table *table)
         {
           if (CHECK_FLAG (rib->status, RIB_ENTRY_REMOVED))
             continue;
-          if (rib->type == proto)
+          if (rib->type == proto && rib->instance == instance)
             {
               rib_delnode (rn, rib);
               n++;
@@ -3664,10 +3682,10 @@ rib_score_proto_table (u_char proto, struct route_table *table)
 
 /* Remove specific by protocol routes. */
 unsigned long
-rib_score_proto (u_char proto)
+rib_score_proto (u_char proto, u_short instance)
 {
-  return  rib_score_proto_table (proto, vrf_table (AFI_IP,  SAFI_UNICAST, 0))
-         +rib_score_proto_table (proto, vrf_table (AFI_IP6, SAFI_UNICAST, 0));
+  return  rib_score_proto_table (proto, instance, vrf_table (AFI_IP,  SAFI_UNICAST, 0))
+         +rib_score_proto_table (proto, instance, vrf_table (AFI_IP6, SAFI_UNICAST, 0));
 }
 
 /* Close RIB and clean up kernel routes. */

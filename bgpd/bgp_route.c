@@ -2242,7 +2242,7 @@ bgp_rib_withdraw (struct bgp_node *rn, struct bgp_info *ri, struct peer *peer,
 }
 
 static struct bgp_info *
-info_make (int type, int sub_type, struct peer *peer, struct attr *attr,
+info_make (int type, int sub_type, u_short instance, struct peer *peer, struct attr *attr,
 	   struct bgp_node *rn)
 {
   struct bgp_info *new;
@@ -2250,6 +2250,7 @@ info_make (int type, int sub_type, struct peer *peer, struct attr *attr,
   /* Make new BGP info. */
   new = XCALLOC (MTYPE_BGP_ROUTE, sizeof (struct bgp_info));
   new->type = type;
+  new->instance = instance;
   new->sub_type = sub_type;
   new->peer = peer;
   new->attr = attr;
@@ -2403,7 +2404,7 @@ bgp_update_rsclient (struct peer *rsclient, afi_t afi, safi_t safi,
                   p->prefixlen, rsclient->host);
     }
 
-  new = info_make(type, sub_type, peer, attr_new, rn);
+  new = info_make(type, sub_type, 0, peer, attr_new, rn);
 
   /* Update MPLS tag. */
   if (safi == SAFI_MPLS_VPN)
@@ -2744,7 +2745,7 @@ bgp_update_main (struct peer *peer, struct prefix *p, struct attr *attr,
     }
 
   /* Make new BGP info. */
-  new = info_make(type, sub_type, peer, attr_new, rn);
+  new = info_make(type, sub_type, 0, peer, attr_new, rn);
 
   /* Update MPLS tag. */
   if (safi == SAFI_MPLS_VPN)
@@ -3880,7 +3881,7 @@ bgp_static_update_rsclient (struct peer *rsclient, struct prefix *p,
     }
 
   /* Make new BGP info. */
-  new = info_make(ZEBRA_ROUTE_BGP, BGP_ROUTE_STATIC, bgp->peer_self,
+  new = info_make(ZEBRA_ROUTE_BGP, BGP_ROUTE_STATIC, 0, bgp->peer_self,
 		  attr_new, rn);
   /* Nexthop reachability check. */
   if (bgp_flag_check (bgp, BGP_FLAG_IMPORT_CHECK))
@@ -4049,7 +4050,7 @@ bgp_static_update_main (struct bgp *bgp, struct prefix *p,
     }
 
   /* Make new BGP info. */
-  new = info_make(ZEBRA_ROUTE_BGP, BGP_ROUTE_STATIC, bgp->peer_self, attr_new,
+  new = info_make(ZEBRA_ROUTE_BGP, BGP_ROUTE_STATIC, 0, bgp->peer_self, attr_new,
 		  rn);
   /* Nexthop reachability check. */
   if (bgp_flag_check (bgp, BGP_FLAG_IMPORT_CHECK))
@@ -4123,7 +4124,7 @@ bgp_static_update_vpnv4 (struct bgp *bgp, struct prefix *p, afi_t afi,
   rn = bgp_afi_node_get (bgp->rib[afi][safi], afi, safi, p, prd);
 
   /* Make new BGP info. */
-  new = info_make(ZEBRA_ROUTE_BGP, BGP_ROUTE_STATIC, bgp->peer_self,
+  new = info_make(ZEBRA_ROUTE_BGP, BGP_ROUTE_STATIC, 0, bgp->peer_self,
 		  bgp_attr_default_intern(BGP_ORIGIN_IGP), rn);
 
   SET_FLAG (new->flags, BGP_INFO_VALID);
@@ -5286,7 +5287,7 @@ bgp_aggregate_route (struct bgp *bgp, struct prefix *p, struct bgp_info *rinew,
   if (aggregate->count > 0)
     {
       rn = bgp_node_get (table, p);
-      new = info_make(ZEBRA_ROUTE_BGP, BGP_ROUTE_AGGREGATE, bgp->peer_self,
+      new = info_make(ZEBRA_ROUTE_BGP, BGP_ROUTE_AGGREGATE, 0, bgp->peer_self,
 		      bgp_attr_aggregate_intern(bgp, origin, aspath, community,
 						aggregate->as_set,
                                                 atomic_aggregate), rn);
@@ -5481,7 +5482,7 @@ bgp_aggregate_add (struct bgp *bgp, struct prefix *p, afi_t afi, safi_t safi,
   if (aggregate->count)
     {
       rn = bgp_node_get (table, p);
-      new = info_make(ZEBRA_ROUTE_BGP, BGP_ROUTE_AGGREGATE, bgp->peer_self,
+      new = info_make(ZEBRA_ROUTE_BGP, BGP_ROUTE_AGGREGATE, 0, bgp->peer_self,
 		      bgp_attr_aggregate_intern(bgp, origin, aspath, community,
 						aggregate->as_set,
                                                 atomic_aggregate), rn);
@@ -6011,7 +6012,7 @@ ALIAS (no_ipv6_aggregate_address_summary_only,
 void
 bgp_redistribute_add (struct prefix *p, const struct in_addr *nexthop,
 		      const struct in6_addr *nexthop6, unsigned int ifindex,
-		      u_int32_t metric, u_char type, u_short tag)
+		      u_int32_t metric, u_char type, u_short instance, u_short tag)
 {
   struct bgp *bgp;
   struct listnode *node, *nnode;
@@ -6023,6 +6024,7 @@ bgp_redistribute_add (struct prefix *p, const struct in_addr *nexthop,
   struct attr *new_attr;
   afi_t afi;
   int ret;
+  struct bgp_redist *red;
 
   /* Make default attribute. */
   bgp_attr_default_set (&attr, BGP_ORIGIN_INCOMPLETE);
@@ -6047,7 +6049,8 @@ bgp_redistribute_add (struct prefix *p, const struct in_addr *nexthop,
     {
       afi = family2afi (p->family);
 
-      if (bgp->redist[afi][type])
+      red = bgp_redist_lookup(bgp, afi, type, instance);
+      if (red)
 	{
 	  struct attr attr_new;
 	  struct attr_extra extra_new;
@@ -6056,19 +6059,18 @@ bgp_redistribute_add (struct prefix *p, const struct in_addr *nexthop,
 	  attr_new.extra = &extra_new;
 	  bgp_attr_dup (&attr_new, &attr);
 
-	  if (bgp->redist_metric_flag[afi][type])
-	    attr_new.med = bgp->redist_metric[afi][type];
+	  if (red->redist_metric_flag)
+	    attr_new.med = red->redist_metric;
 
 	  /* Apply route-map. */
-	  if (bgp->rmap[afi][type].map)
+	  if (red->rmap.map)
 	    {
 	      info.peer = bgp->peer_self;
 	      info.attr = &attr_new;
 
               SET_FLAG (bgp->peer_self->rmap_type, PEER_RMAP_TYPE_REDISTRIBUTE);
 
-	      ret = route_map_apply (bgp->rmap[afi][type].map, p, RMAP_BGP,
-				     &info);
+	      ret = route_map_apply (red->rmap.map, p, RMAP_BGP, &info);
 
               bgp->peer_self->rmap_type = 0;
 
@@ -6080,7 +6082,7 @@ bgp_redistribute_add (struct prefix *p, const struct in_addr *nexthop,
 		  /* Unintern original. */
 		  aspath_unintern (&attr.aspath);
 		  bgp_attr_extra_free (&attr);
-		  bgp_redistribute_delete (p, type);
+		  bgp_redistribute_delete (p, type, instance);
 		  return;
 		}
 	    }
@@ -6130,7 +6132,7 @@ bgp_redistribute_add (struct prefix *p, const struct in_addr *nexthop,
 		}
  	    }
 
-	  new = info_make(type, BGP_ROUTE_REDISTRIBUTE, bgp->peer_self,
+	  new = info_make(type, BGP_ROUTE_REDISTRIBUTE, instance, bgp->peer_self,
 			  new_attr, bn);
 	  SET_FLAG (new->flags, BGP_INFO_VALID);
 
@@ -6147,19 +6149,21 @@ bgp_redistribute_add (struct prefix *p, const struct in_addr *nexthop,
 }
 
 void
-bgp_redistribute_delete (struct prefix *p, u_char type)
+bgp_redistribute_delete (struct prefix *p, u_char type, u_short instance)
 {
   struct bgp *bgp;
   struct listnode *node, *nnode;
   afi_t afi;
   struct bgp_node *rn;
   struct bgp_info *ri;
+  struct bgp_redist *red;
 
   for (ALL_LIST_ELEMENTS (bm->bgp, node, nnode, bgp))
     {
       afi = family2afi (p->family);
 
-      if (bgp->redist[afi][type])
+      red = bgp_redist_lookup(bgp, afi, type, instance);
+      if (red)
 	{
          rn = bgp_afi_node_get (bgp->rib[afi][SAFI_UNICAST], afi, SAFI_UNICAST, p, NULL);
 
@@ -6181,7 +6185,7 @@ bgp_redistribute_delete (struct prefix *p, u_char type)
 
 /* Withdraw specified route type's route. */
 void
-bgp_redistribute_withdraw (struct bgp *bgp, afi_t afi, int type)
+bgp_redistribute_withdraw (struct bgp *bgp, afi_t afi, int type, u_short instance)
 {
   struct bgp_node *rn;
   struct bgp_info *ri;
@@ -6193,7 +6197,8 @@ bgp_redistribute_withdraw (struct bgp *bgp, afi_t afi, int type)
     {
       for (ri = rn->info; ri; ri = ri->next)
 	if (ri->peer == bgp->peer_self
-	    && ri->type == type)
+	    && ri->type == type
+            && ri->instance == instance)
 	  break;
 
       if (ri)

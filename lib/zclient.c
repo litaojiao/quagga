@@ -78,6 +78,62 @@ zclient_free (struct zclient *zclient)
   XFREE (MTYPE_ZCLIENT, zclient);
 }
 
+int
+redist_check_instance (struct redist_proto *red, u_short instance)
+{
+  struct listnode *node;
+  u_short *id;
+
+  if (!red->instances)
+    return 0;
+
+  for (ALL_LIST_ELEMENTS_RO (red->instances, node, id))
+    if (*id == instance)
+      return 1;
+
+  return 0;
+}
+
+void
+redist_add_instance (struct redist_proto *red, u_short instance)
+{
+  u_short *in;
+
+  red->enabled = 1;
+
+  if (!red->instances)
+    red->instances = list_new();
+
+  in = (u_short *)calloc(1, sizeof(u_short));
+  *in = instance;
+  listnode_add (red->instances, in);
+}
+
+void
+redist_del_instance (struct redist_proto *red, u_short instance)
+{
+  struct listnode *node;
+  u_short *id = NULL;
+
+  if (!red->instances)
+    return;
+
+  for (ALL_LIST_ELEMENTS_RO (red->instances, node, id))
+    if (*id == instance)
+        break;
+
+  if (id)
+    {
+      listnode_delete(red->instances, id);
+      if (!red->instances->count)
+        {
+          red->enabled = 0;
+          list_free(red->instances);
+          red->instances = NULL;
+        }
+    }
+}
+
 /* Stop zebra client services. */
 void
 zclient_stop (struct zclient *zclient)
@@ -110,7 +166,7 @@ void
 zclient_reset (struct zclient *zclient)
 {
   zclient_stop (zclient);
-  zclient_init (zclient, zclient->redist_default);
+  zclient_init (zclient, zclient->redist_default, zclient->instance);
 }
 
 #ifdef HAVE_TCP_ZEBRA
@@ -298,6 +354,7 @@ zebra_hello_send (struct zclient *zclient)
 
       zclient_create_header (s, ZEBRA_HELLO);
       stream_putc (s, zclient->redist_default);
+      stream_putw (s, zclient->instance);
       stream_putw_at (s, 0, stream_get_endp (s));
       return zclient_send_message(zclient);
     }
@@ -350,7 +407,7 @@ zclient_connect (struct thread *t)
 /* Initialize zebra client.  Argument redist_default is unwanted
    redistribute route type. */
 void
-zclient_init (struct zclient *zclient, int redist_default)
+zclient_init (struct zclient *zclient, int redist_default, u_short instance)
 {
   int i;
   
@@ -367,7 +424,8 @@ zclient_init (struct zclient *zclient, int redist_default)
   /* Set unwanted redistribute route.  bgpd does not need BGP route
      redistribution. */
   zclient->redist_default = redist_default;
-  zclient->redist[redist_default] = 1;
+  zclient->instance = instance;
+  redist_add_instance (&zclient->redist[redist_default], instance);
 
   /* Set default-information redistribute to zero. */
   zclient->default_information = 0;
@@ -483,6 +541,7 @@ zapi_ipv4_route (u_char cmd, struct zclient *zclient, struct prefix_ipv4 *p,
   
   /* Put type and nexthop. */
   stream_putc (s, api->type);
+  stream_putw (s, api->instance);
   stream_putc (s, api->flags);
   stream_putc (s, api->message);
   stream_putw (s, api->safi);
@@ -564,6 +623,7 @@ zapi_ipv6_route (u_char cmd, struct zclient *zclient, struct prefix_ipv6 *p,
 
   /* Put type and nexthop. */
   stream_putc (s, api->type);
+  stream_putw (s, api->instance);
   stream_putc (s, api->flags);
   stream_putc (s, api->message);
   stream_putw (s, api->safi);
@@ -619,7 +679,8 @@ zapi_ipv6_route (u_char cmd, struct zclient *zclient, struct prefix_ipv6 *p,
  * sending client
  */
 int
-zebra_redistribute_send (int command, struct zclient *zclient, int type)
+zebra_redistribute_send (int command, struct zclient *zclient, int type,
+                         u_short instance)
 {
   struct stream *s;
 
@@ -628,6 +689,7 @@ zebra_redistribute_send (int command, struct zclient *zclient, int type)
   
   zclient_create_header (s, command);
   stream_putc (s, type);
+  stream_putw (s, instance);
   
   stream_putw_at (s, 0, stream_get_endp (s));
   
@@ -1116,24 +1178,25 @@ zclient_read (struct thread *thread)
 }
 
 void
-zclient_redistribute (int command, struct zclient *zclient, int type)
+zclient_redistribute (int command, struct zclient *zclient, int type,
+                      u_short instance)
 {
 
   if (command == ZEBRA_REDISTRIBUTE_ADD) 
     {
-      if (zclient->redist[type])
+      if (redist_check_instance(&zclient->redist[type], instance))
          return;
-      zclient->redist[type] = 1;
+      redist_add_instance(&zclient->redist[type], instance);
     }
   else
     {
-      if (!zclient->redist[type])
+      if (!redist_check_instance(&zclient->redist[type], instance))
          return;
-      zclient->redist[type] = 0;
+      redist_del_instance(&zclient->redist[type], instance);
     }
 
   if (zclient->sock > 0)
-    zebra_redistribute_send (command, zclient, type);
+    zebra_redistribute_send (command, zclient, type, instance);
 }
 
 
