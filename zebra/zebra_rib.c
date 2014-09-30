@@ -365,6 +365,22 @@ nexthop_ipv4_ifindex_add (struct rib *rib, struct in_addr *ipv4,
   return nexthop;
 }
 
+struct nexthop *
+nexthop_ipv4_ifindex_ol_add (struct rib *rib, const struct in_addr *ipv4,
+                             const struct in_addr *src, const unsigned int ifindex)
+{
+  struct nexthop *nexthop = XCALLOC (MTYPE_NEXTHOP, sizeof (struct nexthop));
+
+  nexthop->type = NEXTHOP_TYPE_IPV4_IFINDEX;
+  IPV4_ADDR_COPY (&nexthop->gate.ipv4, ipv4);
+  if (src)
+    IPV4_ADDR_COPY (&nexthop->src.ipv4, src);
+  nexthop->ifindex = ifindex;
+  SET_FLAG(nexthop->flags, NEXTHOP_FLAG_ONLINK);
+  nexthop_add (rib, nexthop);
+  return nexthop;
+}
+
 #ifdef HAVE_IPV6
 struct nexthop *
 nexthop_ipv6_add (struct rib *rib, struct in6_addr *ipv6)
@@ -459,6 +475,7 @@ nexthop_active_ipv4 (struct rib *rib, struct nexthop *nexthop, int set,
   struct nexthop *newhop, *tnewhop;
   struct nexthop *resolved_hop;
   int recursing = 0;
+  struct interface *ifp;
 
   if (nexthop->type == NEXTHOP_TYPE_IPV4)
     nexthop->ifindex = 0;
@@ -475,6 +492,19 @@ nexthop_active_ipv4 (struct rib *rib, struct nexthop *nexthop, int set,
   /* nexthop for a different route may not have this flag set */
   if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_FILTERED))
     return 0;
+
+  /* onlink flag is an indication that we need to only check that
+   * the link is up, we won't find the GW address in the routing
+   * table.
+   */
+  if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ONLINK))
+    {
+      ifp = if_lookup_by_index (nexthop->ifindex);
+      if (ifp && if_is_operative(ifp))
+	return 1;
+      else
+	return 0;
+    }
 
   /* Make lookup prefix. */
   memset (&p, 0, sizeof (struct prefix_ipv4));
@@ -558,6 +588,8 @@ nexthop_active_ipv4 (struct rib *rib, struct nexthop *nexthop, int set,
 			      {
 				resolved_hop->type = NEXTHOP_TYPE_IPV4_IFINDEX;
 				resolved_hop->ifindex = newhop->ifindex;
+				if (newhop->flags & NEXTHOP_FLAG_ONLINK)
+				  resolved_hop->flags |= NEXTHOP_FLAG_ONLINK;
 			      }
 			  }
 
@@ -608,6 +640,8 @@ nexthop_active_ipv4 (struct rib *rib, struct nexthop *nexthop, int set,
 			      {
 				resolved_hop->type = NEXTHOP_TYPE_IPV4_IFINDEX;
 				resolved_hop->ifindex = newhop->ifindex;
+				if (newhop->flags & NEXTHOP_FLAG_ONLINK)
+				  resolved_hop->flags |= NEXTHOP_FLAG_ONLINK;
 			      }
 			  }
 
