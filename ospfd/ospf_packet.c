@@ -640,6 +640,7 @@ ospf_write (struct thread *thread)
 {
   struct ospf *ospf = THREAD_ARG (thread);
   struct ospf_interface *oi;
+  struct ospf_interface *last_serviced_oi = NULL;
   struct ospf_packet *op;
   struct sockaddr_in sa_dst;
   struct ip iph;
@@ -673,12 +674,23 @@ ospf_write (struct thread *thread)
    * and reliability - not more data, than our
    * socket can accept
    */
-  maxdatasize = MIN (oi->ifp->mtu, ospf->maxsndbuflen) -
-    sizeof (struct ip);
-  
-  while ((pkt_count < ospf->write_multiplier) && ospf_fifo_count(oi->obuf))
+  while ((pkt_count < ospf->write_oi_count) && oi && (last_serviced_oi != oi))
     {
+      /* If there is only packet in the queue, the oi is removed from
+	 write-q, so fix up the last interface that was serviced */
+      if (last_serviced_oi == NULL)
+	{
+	  last_serviced_oi = oi;
+	}
       pkt_count++;
+
+      /* convenience - max OSPF data per packet,
+       * and reliability - not more data, than our
+       * socket can accept
+       */
+      maxdatasize = MIN (oi->ifp->mtu, ospf->maxsndbuflen) -
+        sizeof (struct ip);
+
       /* Get one packet from queue. */
       op = ospf_fifo_head (oi->obuf);
       assert (op);
@@ -802,11 +814,24 @@ ospf_write (struct thread *thread)
 
       /* Move this interface to the tail of write_q to
 	 serve everyone in a round robin fashion */
-      listnode_move_to_tail (ospf->oi_write_q, node);
+      list_delete_node (ospf->oi_write_q, node);
       if (ospf_fifo_head (oi->obuf) == NULL)
+        {
+          oi->on_write_q = 0;
+	  last_serviced_oi = oi = NULL;
+        }
+      else
+        {
+          listnode_add (ospf->oi_write_q, oi);
+        }
+
+      /* Setup to service from the head of the queue again */
+      if (!list_isempty (ospf->oi_write_q))
 	{
-	  oi->on_write_q = 0;
-	  list_delete_node (ospf->oi_write_q, node);
+          node = listhead (ospf->oi_write_q);
+          assert (node);
+          oi = listgetdata (node);
+          assert (oi);
 	}
     }
   
