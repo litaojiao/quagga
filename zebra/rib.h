@@ -29,6 +29,7 @@
 #include "nexthop.h"
 
 #define DISTANCE_INFINITY  255
+#define ZEBRA_KERNEL_TABLE_MAX 252 /* support for no more than this rt tables */
 
 struct rib
 {
@@ -52,7 +53,7 @@ struct rib
   u_short instance;
 
   /* Which routing table */
-  int table;			
+  int table;
 
   /* Metric */
   u_int32_t metric;
@@ -303,6 +304,8 @@ struct vrf
   /* Import check table (used mostly by BGP */
   struct route_table *import_check_table[AFI_MAX];
 
+  /* Routing tables off of main table for redistribute table */
+  struct route_table *other_table[AFI_MAX][ZEBRA_KERNEL_TABLE_MAX];
 };
 
 /*
@@ -386,6 +389,10 @@ rib_bogus_ipv6 (int type, struct prefix_ipv6 *p,
 extern struct vrf *vrf_lookup (u_int32_t);
 extern struct route_table *vrf_table (afi_t afi, safi_t safi, u_int32_t id);
 extern struct route_table *vrf_static_table (afi_t afi, safi_t safi, u_int32_t id);
+extern struct route_table *vrf_other_route_table (afi_t afi, u_int32_t table_id,
+						  u_int32_t vrf_id);
+extern int is_zebra_valid_kernel_table(u_int32_t table_id);
+extern int is_zebra_main_routing_table(u_int32_t table_id);
 
 /* NOTE:
  * All rib_add_ipv[46]* functions will not just add prefix into RIB, but
