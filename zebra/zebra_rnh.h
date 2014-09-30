@@ -30,6 +30,8 @@
 struct rnh
 {
   u_char flags;
+#define ZEBRA_NHT_CONNECTED  	0x1
+#define ZEBRA_NHT_EXACT_MATCH   0x2
   struct rib *state;
   struct list *client_list;
   struct prefix resolved_route;
@@ -37,17 +39,29 @@ struct rnh
   int filtered[ZEBRA_ROUTE_MAX]; /* if this has been filtered for client */
 };
 
+typedef enum 
+  {
+    RNH_NEXTHOP_TYPE,
+    RNH_IMPORT_CHECK_TYPE
+  } rnh_type_t;
+
 extern int zebra_rnh_ip_default_route;
 extern int zebra_rnh_ipv6_default_route;
 
-extern struct rnh *zebra_add_rnh(struct prefix *p, u_int32_t vrfid);
-extern struct rnh *zebra_lookup_rnh(struct prefix *p, u_int32_t vrfid);
-extern void zebra_delete_rnh(struct rnh *rnh);
-extern void zebra_add_rnh_client(struct rnh *rnh, struct zserv *client);
-extern void zebra_remove_rnh_client(struct rnh *rnh, struct zserv *client);
-extern int zebra_evaluate_rnh_table(int vrfid, int family, int force);
-extern int zebra_dispatch_rnh_table(int vrfid, int family, struct zserv *cl);
-extern void zebra_print_rnh_table(int vrfid, int family, struct vty *vty);
+extern struct rnh *zebra_add_rnh(struct prefix *p, u_int32_t vrfid,
+                                 rnh_type_t type);
+extern struct rnh *zebra_lookup_rnh(struct prefix *p, u_int32_t vrfid,
+                                    rnh_type_t type);
+extern void zebra_delete_rnh(struct rnh *rnh, rnh_type_t type);
+extern void zebra_add_rnh_client(struct rnh *rnh, struct zserv *client,
+                                 rnh_type_t type); 
+extern void zebra_remove_rnh_client(struct rnh *rnh, struct zserv *client,
+                                    rnh_type_t type); 
+extern int zebra_evaluate_rnh_table(int vrfid, int family, int force, rnh_type_t type);
+extern int zebra_dispatch_rnh_table(int vrfid, int family, struct zserv *cl, rnh_type_t);
+extern void zebra_print_rnh_table(int vrfid, int family, struct vty *vty, rnh_type_t);
+extern int zebra_cleanup_rnh_client(int vrf, int family, struct zserv *client,
+                                    rnh_type_t type);
+
 extern char *rnh_str(struct rnh *rnh, char *buf, int size);
-extern int zebra_cleanup_rnh_client(int vrf, int family, struct zserv *client);
 #endif /*_ZEBRA_RNH_H */

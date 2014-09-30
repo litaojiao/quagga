@@ -750,7 +750,7 @@ DEFUN (ip_protocol_nht_rmap,
     }
 
   nht_rm[AFI_IP][i] = XSTRDUP (MTYPE_ROUTE_MAP_NAME, argv[1]);
-  zebra_evaluate_rnh_table(0, AF_INET, 1);
+  zebra_evaluate_rnh_table(0, AF_INET, 1, RNH_NEXTHOP_TYPE);
 
   return CMD_SUCCESS;
 }
@@ -783,7 +783,7 @@ DEFUN (no_ip_protocol_nht_rmap,
     {
       XFREE (MTYPE_ROUTE_MAP_NAME, nht_rm[AFI_IP][i]);
       nht_rm[AFI_IP][i] = NULL;
-      zebra_evaluate_rnh_table(0, AF_INET, 1);
+      zebra_evaluate_rnh_table(0, AF_INET, 1, RNH_NEXTHOP_TYPE);
     }
   return CMD_SUCCESS;
 }
@@ -848,7 +848,7 @@ DEFUN (ipv6_protocol_nht_rmap,
   if (nht_rm[AFI_IP6][i])
     XFREE (MTYPE_ROUTE_MAP_NAME, nht_rm[AFI_IP6][i]);
   nht_rm[AFI_IP6][i] = XSTRDUP (MTYPE_ROUTE_MAP_NAME, argv[1]);
-  zebra_evaluate_rnh_table(0, AF_INET6, 1);
+  zebra_evaluate_rnh_table(0, AF_INET6, 1, RNH_NEXTHOP_TYPE);
 
   return CMD_SUCCESS;
 }
@@ -880,8 +880,8 @@ DEFUN (no_ipv6_protocol_nht_rmap,
       (argc < 2))
     {
       XFREE (MTYPE_ROUTE_MAP_NAME, nht_rm[AFI_IP][i]);
-      nht_rm[AFI_IP][i] = NULL;
-      zebra_evaluate_rnh_table(0, AF_INET, 1);
+      nht_rm[AFI_IP6][i] = NULL;
+      zebra_evaluate_rnh_table(0, AF_INET6, 1, RNH_NEXTHOP_TYPE);
     }
 
   return CMD_SUCCESS;
@@ -1348,8 +1348,8 @@ zebra_route_map_update_timer (struct thread *thread)
     zlog_debug("Event driven route-map update triggered");
 
   rib_update();
-  zebra_evaluate_rnh_table(0, AF_INET, 1);
-  zebra_evaluate_rnh_table(0, AF_INET6, 1);
+  zebra_evaluate_rnh_table(0, AF_INET, 1, RNH_NEXTHOP_TYPE);
+  zebra_evaluate_rnh_table(0, AF_INET6, 1, RNH_NEXTHOP_TYPE);
 
   return (0);
 }

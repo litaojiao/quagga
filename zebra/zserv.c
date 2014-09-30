@@ -747,59 +747,134 @@ zsend_ipv4_nexthop_lookup (struct zserv *client, struct in_addr addr)
 
 /* Nexthop register */
 static int
-zserv_nexthop_register (struct zserv *client, int sock, u_short length)
+zserv_rnh_register (struct zserv *client, int sock, u_short length,
+		    rnh_type_t type)
 {
   struct rnh *rnh;
   struct stream *s;
   struct prefix p;
   u_short l = 0;
+  u_char flags = 0;
+  int force = 0;
+  int do_inet = 0;
+  int do_inet6 = 0;
 
   if (IS_ZEBRA_DEBUG_NHT)
-    zlog_debug("nexthop_register msg from client %s: length=%d\n",
-	       zebra_route_string(client->proto), length);
+    zlog_debug("rnh_register msg from client %s: length=%d, type=%s\n",
+	       zebra_route_string(client->proto), length,
+	       (type == RNH_NEXTHOP_TYPE) ? "nexthop" : "route");
 
   s = client->ibuf;
 
   while (l < length)
     {
+      flags = stream_getc(s);
       p.family = stream_getw(s);
       p.prefixlen = stream_getc(s);
-      l += 3;
-      stream_get(&p.u.prefix, s, PSIZE(p.prefixlen));
-      l += PSIZE(p.prefixlen);
-      rnh = zebra_add_rnh(&p, 0);
-      zebra_add_rnh_client(rnh, client);
+      l += 4;
+      if (p.family == AF_INET)
+	{
+	  p.u.prefix4.s_addr = stream_get_ipv4(s);
+	  l += IPV4_MAX_BYTELEN;
+	  do_inet = 1;
+	}
+      else if (p.family == AF_INET6)
+	{
+	  stream_get(&p.u.prefix6, s, IPV6_MAX_BYTELEN);
+	  l += IPV6_MAX_BYTELEN;
+	  do_inet6 = 1;
+	}
+      else
+	{
+	  zlog_err("rnh_register: Received unknown family type %d\n",
+		   p.family);
+	  return;
+	}
+      rnh = zebra_add_rnh(&p, 0, type);
+      if (type == RNH_NEXTHOP_TYPE)
+	{
+	  if (flags && !CHECK_FLAG(rnh->flags, ZEBRA_NHT_CONNECTED))
+	    {
+	      SET_FLAG(rnh->flags, ZEBRA_NHT_CONNECTED);
+	      force = 1;
+	    }
+	  else if (!flags && CHECK_FLAG(rnh->flags, ZEBRA_NHT_CONNECTED))
+	    {
+	      UNSET_FLAG(rnh->flags, ZEBRA_NHT_CONNECTED);
+	      force = 1;
+	    }
+	}
+      else if (type == RNH_IMPORT_CHECK_TYPE)
+	{
+	  if (flags && !CHECK_FLAG(rnh->flags, ZEBRA_NHT_EXACT_MATCH))
+	    {
+	      force = 1;
+	      SET_FLAG(rnh->flags, ZEBRA_NHT_EXACT_MATCH);
+	    }
+	  else if (!flags && CHECK_FLAG(rnh->flags, ZEBRA_NHT_EXACT_MATCH))
+	    {
+	      force = 1;
+	      UNSET_FLAG(rnh->flags, ZEBRA_NHT_EXACT_MATCH);
+	    }
+	}
+
+      client->nh_reg_time = quagga_time(NULL);
+      zebra_add_rnh_client(rnh, client, type);
     }
-  zebra_evaluate_rnh_table(0, AF_INET, 0);
-  zebra_evaluate_rnh_table(0, AF_INET6, 0);
+  if (do_inet)
+    zebra_evaluate_rnh_table(0, AF_INET, force, type);
+  if (do_inet6)
+    zebra_evaluate_rnh_table(0, AF_INET6, force, type);
+
   return 0;
 }
 
 /* Nexthop register */
 static int
-zserv_nexthop_unregister (struct zserv *client, int sock, u_short length)
+zserv_rnh_unregister (struct zserv *client, int sock, u_short length,
+		      rnh_type_t type)
 {
   struct rnh *rnh;
   struct stream *s;
   struct prefix p;
   u_short l = 0;
+  u_char flags;
+  u_char exact_match;
 
   if (IS_ZEBRA_DEBUG_NHT)
-    zlog_debug("nexthop_unregister msg from client %s: length=%d\n",
+    zlog_debug("rnh_unregister msg from client %s: length=%d\n",
 	       zebra_route_string(client->proto), length);
 
   s = client->ibuf;
 
   while (l < length)
     {
+      flags = stream_getc(s);
       p.family = stream_getw(s);
       p.prefixlen = stream_getc(s);
-      l += 3;
-      stream_get(&p.u.prefix, s, PSIZE(p.prefixlen));
-      l += PSIZE(p.prefixlen);
-      rnh = zebra_lookup_rnh(&p, 0);
+      l += 4;
+      if (p.family == AF_INET)
+	{
+	  p.u.prefix4.s_addr = stream_get_ipv4(s);
+	  l += IPV4_MAX_BYTELEN;
+	}
+      else if (p.family == AF_INET6)
+	{
+	  stream_get(&p.u.prefix6, s, IPV6_MAX_BYTELEN);
+	  l += IPV6_MAX_BYTELEN;
+	}
+      else
+	{
+	  zlog_err("rnh_register: Received unknown family type %d\n",
+		   p.family);
+	  return;
+	}
+      rnh = zebra_lookup_rnh(&p, 0, type);
       if (rnh)
-	zebra_remove_rnh_client(rnh, client);
+	{
+	  client->nh_dereg_time = quagga_time(NULL);
+	  zebra_remove_rnh_client(rnh, client, type);
+	}
     }
   return 0;
 }
@@ -1437,8 +1512,10 @@ zebra_score_rib (int client_sock)
 static void
 zebra_client_close (struct zserv *client)
 {
-  zebra_cleanup_rnh_client(0, AF_INET, client);
-  zebra_cleanup_rnh_client(0, AF_INET6, client);
+  zebra_cleanup_rnh_client(0, AF_INET, client, RNH_NEXTHOP_TYPE);
+  zebra_cleanup_rnh_client(0, AF_INET6, client, RNH_NEXTHOP_TYPE);
+  zebra_cleanup_rnh_client(0, AF_INET, client, RNH_IMPORT_CHECK_TYPE);
+  zebra_cleanup_rnh_client(0, AF_INET6, client, RNH_IMPORT_CHECK_TYPE);
 
   /* Close file descriptor. */
   if (client->sock)
@@ -1653,10 +1730,16 @@ zebra_client_read (struct thread *thread)
       zread_hello (client);
       break;
     case ZEBRA_NEXTHOP_REGISTER:
-      zserv_nexthop_register(client, sock, length);
+      zserv_rnh_register(client, sock, length, RNH_NEXTHOP_TYPE);
       break;
     case ZEBRA_NEXTHOP_UNREGISTER:
-      zserv_nexthop_unregister(client, sock, length);
+      zserv_rnh_unregister(client, sock, length, RNH_NEXTHOP_TYPE);
+      break;
+    case ZEBRA_IMPORT_ROUTE_REGISTER:
+      zserv_rnh_register(client, sock, length, RNH_IMPORT_CHECK_TYPE);
+      break;
+    case ZEBRA_IMPORT_ROUTE_UNREGISTER:
+      zserv_rnh_unregister(client, sock, length, RNH_IMPORT_CHECK_TYPE);
       break;
     default:
       zlog_info ("Zebra received unknown command %d", command);

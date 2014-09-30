@@ -231,6 +231,7 @@ extern int bgp_static_set_vpnv4 (struct vty *vty, const char *,
 
 extern int bgp_static_unset_vpnv4 (struct vty *, const char *, 
                             const char *, const char *);
+extern void bgp_static_redo_import_check (struct bgp *);
 
 /* this is primarily for MPLS-VPN */
 extern int bgp_update (struct peer *, struct prefix *, struct attr *,

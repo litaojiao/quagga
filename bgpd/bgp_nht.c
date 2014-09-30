@@ -41,28 +41,27 @@
 
 extern struct zclient *zclient;
 extern struct bgp_table *bgp_nexthop_cache_table[AFI_MAX];
+extern struct bgp_table *bgp_import_check_table[AFI_MAX];
 
-static void register_nexthop(struct bgp_nexthop_cache *bnc);
-static void unregister_nexthop (struct bgp_nexthop_cache *bnc);
+static void register_zebra_rnh(struct bgp_nexthop_cache *bnc,
+			   int is_bgp_static_route);
+static void unregister_zebra_rnh(struct bgp_nexthop_cache *bnc,
+				 int is_bgp_static_route);
 static void evaluate_paths(struct bgp_nexthop_cache *bnc);
 static int make_prefix(int afi, struct bgp_info *ri, struct prefix *p);
 static void path_nh_map(struct bgp_info *path, struct bgp_nexthop_cache *bnc,
 			int keep);
 
 int
-bgp_find_nexthop (struct bgp_info *path, int *changed, int *metricchanged)
+bgp_find_nexthop (struct bgp_info *path, int connected)
 {
   struct bgp_nexthop_cache *bnc = path->nexthop;
 
   if (!bnc)
     return 0;
 
-  if (changed)
-    *changed = CHECK_FLAG(bnc->change_flags, BGP_NEXTHOP_CHANGED);
-
-  if (metricchanged)
-    *metricchanged = CHECK_FLAG(bnc->change_flags,
-				BGP_NEXTHOP_METRIC_CHANGED);
+  if (connected && !(CHECK_FLAG(bnc->flags, BGP_NEXTHOP_CONNECTED)))
+    return 0;
 
   return (CHECK_FLAG(bnc->flags, BGP_NEXTHOP_VALID));
 }
@@ -77,7 +76,7 @@ bgp_unlink_nexthop (struct bgp_info *path)
 
   path_nh_map(path, NULL, 0);
 
-  if (LIST_EMPTY(&(bnc->paths)))
+  if (LIST_EMPTY(&(bnc->paths)) && !bnc->nht_info)
     {
       if (BGP_DEBUG(nht, NHT))
 	{
@@ -85,7 +84,7 @@ bgp_unlink_nexthop (struct bgp_info *path)
 	  zlog_debug("bgp_unlink_nexthop: freeing bnc %s",
 		     bnc_str(bnc, buf, INET6_ADDRSTRLEN));
 	}
-      unregister_nexthop(bnc);
+      unregister_zebra_rnh(bnc, CHECK_FLAG(bnc->flags, BGP_STATIC_ROUTE));
       bnc->node->info = NULL;
       bgp_unlock_node(bnc->node);
       bnc_free(bnc);
@@ -93,16 +92,110 @@ bgp_unlink_nexthop (struct bgp_info *path)
 }
 
 int
-bgp_find_or_add_nexthop (afi_t afi, struct bgp_info *ri, int *changed,
-			 int *metricchanged)
+bgp_multiaccess_check (afi_t afi, struct bgp_info *ri, struct peer *peer)
+{
+  struct bgp_node *rn1, *rn2;
+  struct prefix p;
+  int ret;
+  struct bgp_nexthop_cache *bnc1, *bnc2;
+
+  if (make_prefix(afi, ri, &p) < 0)
+    return 0;
+
+  rn1 = bgp_node_lookup (bgp_nexthop_cache_table[afi], &p);
+  if (!rn1)
+    return 0;
+
+  if (afi == AFI_IP)
+    {
+      p.family = AF_INET;
+      p.prefixlen = IPV4_MAX_BITLEN;
+      p.u.prefix4 = peer->su.sin.sin_addr;
+    }
+  else if (afi == AFI_IP6)
+    {
+      p.family = AF_INET6;
+      p.prefixlen = IPV6_MAX_BITLEN;
+      p.u.prefix6 = peer->su.sin6.sin6_addr;
+    }
+
+  rn2 = bgp_node_lookup (bgp_nexthop_cache_table[afi], &p);
+  if (!rn2)
+    {
+      bgp_unlock_node(rn1);
+      return 0;
+    }
+
+  bnc1 = rn1->info;
+  bnc1 = rn2->info;
+
+  ret = (rn1 == rn2) ? 1 : 0;
+
+  /* if entries match, ensure that they're connected entries */
+  if (bnc1 && CHECK_FLAG(bnc1->flags, BGP_NEXTHOP_CONNECTED) &&
+      bnc2 && CHECK_FLAG(bnc2->flags, BGP_NEXTHOP_CONNECTED))
+    ret = ret ? 1 : 0;
+  else
+    ret = 0;
+
+  bgp_unlock_node(rn1);
+  bgp_unlock_node(rn2);
+
+  return (ret);
+}
+
+int
+bgp_find_or_add_nexthop (afi_t afi, struct bgp_info *ri, struct peer *peer,
+			 int connected)
 {
   struct bgp_node *rn;
   struct bgp_nexthop_cache *bnc;
   struct prefix p;
+  int is_bgp_static_route = 0;
 
-  if (make_prefix(afi, ri, &p) < 0)
-    return 1;
-  rn = bgp_node_get (bgp_nexthop_cache_table[afi], &p);
+  if (ri)
+    {
+      /* This will return TRUE if the global IPv6 NH is a link local addr */
+      if (make_prefix(afi, ri, &p) < 0)
+	return 1;
+      is_bgp_static_route = ((ri->type == ZEBRA_ROUTE_BGP) &&
+			     (ri->sub_type == BGP_ROUTE_STATIC)) ? 1 : 0;
+    }
+  else if (peer)
+    {
+      if (afi == AFI_IP)
+	{
+	  p.family = AF_INET;
+	  p.prefixlen = IPV4_MAX_BITLEN;
+	  p.u.prefix4 = peer->su.sin.sin_addr;
+	}
+      else if (afi == AFI_IP6)
+	{
+	  p.family = AF_INET6;
+	  p.prefixlen = IPV6_MAX_BITLEN;
+	  p.u.prefix6 = peer->su.sin6.sin6_addr;
+
+	  /* Don't register link local NH */
+	  if (IN6_IS_ADDR_LINKLOCAL(&p.u.prefix6))
+	    return 1;
+	}
+      else
+	{
+	  if (BGP_DEBUG(nht, NHT))
+	    {
+	      zlog_debug("%s: Attempting to register with unknown AFI %d (not %d or %d)",
+			 __FUNCTION__, afi, AFI_IP, AFI_IP6);
+	    }
+	  return 0;
+	}
+    }
+  else
+    return 0;
+
+  if (is_bgp_static_route)
+    rn = bgp_node_get (bgp_import_check_table[afi], &p);
+  else
+    rn = bgp_node_get (bgp_nexthop_cache_table[afi], &p);
 
   if (!rn->info)
     {
@@ -110,29 +203,127 @@ bgp_find_or_add_nexthop (afi_t afi, struct bgp_info *ri, int *changed,
       rn->info = bnc;
       bnc->node = rn;
       bgp_lock_node(rn);
-      register_nexthop(bnc);
+
+      if (BGP_DEBUG(nht, NHT))
+        {
+          char buf[INET6_ADDRSTRLEN];
+
+          zlog_debug("Allocated bnc %s peer %p",
+                     bnc_str(bnc, buf, INET6_ADDRSTRLEN), peer);
+        }
     }
+
   bnc = rn->info;
   bgp_unlock_node (rn);
-  path_nh_map(ri, bnc, 1);
 
-  if (changed)
-    *changed = CHECK_FLAG(bnc->change_flags, BGP_NEXTHOP_CHANGED);
+  if (is_bgp_static_route)
+    {
+      SET_FLAG(bnc->flags, BGP_STATIC_ROUTE);
 
-  if (metricchanged)
-    *metricchanged = CHECK_FLAG(bnc->change_flags,
-				BGP_NEXTHOP_METRIC_CHANGED);
+      /* If we're toggling the type, re-register */
+      if ((bgp_flag_check(bgp, BGP_FLAG_IMPORT_CHECK_EXACT_MATCH)) &&
+	  !CHECK_FLAG(bnc->flags, BGP_STATIC_ROUTE_EXACT_MATCH))
+	{
+	  SET_FLAG(bnc->flags, BGP_STATIC_ROUTE_EXACT_MATCH);
+	  UNSET_FLAG(bnc->flags, BGP_NEXTHOP_REGISTERED);
+	  UNSET_FLAG(bnc->flags, BGP_NEXTHOP_VALID);
+	}
+      else if ((!bgp_flag_check(bgp, BGP_FLAG_IMPORT_CHECK_EXACT_MATCH)) &&
+	       CHECK_FLAG(bnc->flags, BGP_STATIC_ROUTE_EXACT_MATCH))
+	{
+	  UNSET_FLAG(bnc->flags, BGP_STATIC_ROUTE_EXACT_MATCH);
+	  UNSET_FLAG(bnc->flags, BGP_NEXTHOP_REGISTERED);
+	  UNSET_FLAG(bnc->flags, BGP_NEXTHOP_VALID);
+	}
+    }
+  else if (connected && ! CHECK_FLAG(bnc->flags, BGP_NEXTHOP_CONNECTED))
+    {
+      SET_FLAG(bnc->flags, BGP_NEXTHOP_CONNECTED);
+      UNSET_FLAG(bnc->flags, BGP_NEXTHOP_REGISTERED);
+      UNSET_FLAG(bnc->flags, BGP_NEXTHOP_VALID);
+    }
+  else if (!connected && CHECK_FLAG(bnc->flags, BGP_NEXTHOP_CONNECTED))
+    {
+      UNSET_FLAG(bnc->flags, BGP_NEXTHOP_CONNECTED);
+      UNSET_FLAG(bnc->flags, BGP_NEXTHOP_REGISTERED);
+      UNSET_FLAG(bnc->flags, BGP_NEXTHOP_VALID);
+    }
 
-  if (CHECK_FLAG(bnc->flags, BGP_NEXTHOP_VALID) && bnc->metric)
-    (bgp_info_extra_get(ri))->igpmetric = bnc->metric;
-  else if (ri->extra)
-    ri->extra->igpmetric = 0;
+  if (!CHECK_FLAG(bnc->flags, BGP_NEXTHOP_REGISTERED))
+    register_zebra_rnh(bnc, is_bgp_static_route);
+
+  if (ri)
+    {
+      path_nh_map(ri, bnc, 1);
+
+      if (CHECK_FLAG(bnc->flags, BGP_NEXTHOP_VALID) && bnc->metric)
+	(bgp_info_extra_get(ri))->igpmetric = bnc->metric;
+      else if (ri->extra)
+	ri->extra->igpmetric = 0;
+    }
+  else if (peer)
+    bnc->nht_info = (void *)peer;
 
   return (CHECK_FLAG(bnc->flags, BGP_NEXTHOP_VALID));
 }
 
 void
-bgp_parse_nexthop_update (void)
+bgp_delete_connected_nexthop (afi_t afi, struct peer *peer)
+{
+  struct bgp_node *rn;
+  struct bgp_nexthop_cache *bnc;
+  struct prefix p;
+
+  if (afi == AFI_IP)
+    {
+      p.family = AF_INET;
+      p.prefixlen = IPV4_MAX_BITLEN;
+      p.u.prefix4 = peer->su.sin.sin_addr;
+    }
+  else if (afi == AFI_IP6)
+    {
+      p.family = AF_INET6;
+      p.prefixlen = IPV6_MAX_BITLEN;
+      p.u.prefix6 = peer->su.sin6.sin6_addr;
+    }
+
+  rn = bgp_node_lookup(bgp_nexthop_cache_table[family2afi(p.family)], &p);
+  if (!rn || !rn->info)
+    {
+      if (BGP_DEBUG(nht, NHT))
+        zlog_debug("Cannot find connected NHT node for peer %s", peer->host);
+      if (rn)
+        bgp_unlock_node (rn);
+      return;
+    }
+
+  bnc = rn->info;
+  bgp_unlock_node(rn);
+
+  if (bnc->nht_info != peer)
+    {
+      if (BGP_DEBUG(nht, NHT))
+        zlog_debug("Connected NHT %p node for peer %s points to %p",
+                    bnc, peer->host, bnc->nht_info);
+      return;
+    }
+
+  bnc->nht_info = NULL;
+
+  if (LIST_EMPTY(&(bnc->paths)))
+    {
+      if (BGP_DEBUG(nht, NHT))
+        zlog_debug("Freeing connected NHT node %p for peer %s",
+                    bnc,  peer->host);
+      unregister_zebra_rnh(bnc, 0);
+      bnc->node->info = NULL;
+      bgp_unlock_node(bnc->node);
+      bnc_free(bnc);
+    }
+}
+
+void
+bgp_parse_nexthop_update (int command)
 {
   struct stream *s;
   struct bgp_node *rn;
@@ -163,7 +354,11 @@ bgp_parse_nexthop_update (void)
       break;
     }
 
-  rn = bgp_node_lookup(bgp_nexthop_cache_table[family2afi(p.family)], &p);
+  if (command == ZEBRA_NEXTHOP_UPDATE)
+    rn = bgp_node_lookup(bgp_nexthop_cache_table[family2afi(p.family)], &p);
+  else if (command == ZEBRA_IMPORT_CHECK_UPDATE)
+    rn = bgp_node_lookup(bgp_import_check_table[family2afi(p.family)], &p);
+
   if (!rn || !rn->info)
     {
       if (BGP_DEBUG(nht, NHT))
@@ -172,10 +367,13 @@ bgp_parse_nexthop_update (void)
 	  prefix2str(&p, buf, INET6_ADDRSTRLEN);
 	  zlog_debug("parse nexthop update(%s): rn not found", buf);
 	}
+      if (rn)
+        bgp_unlock_node (rn);
       return;
     }
 
   bnc = rn->info;
+  bgp_unlock_node (rn);
   bnc->last_update = bgp_clock();
   bnc->change_flags = 0;
   metric = stream_getl (s);
@@ -198,6 +396,10 @@ bgp_parse_nexthop_update (void)
 
   if (nexthop_num)
     {
+      /* notify bgp fsm if nbr ip goes from invalid->valid */
+      if (!bnc->nexthop_num)
+	UNSET_FLAG(bnc->flags, BGP_NEXTHOP_PEER_NOTIFIED);
+
       bnc->flags |= BGP_NEXTHOP_VALID;
       bnc->metric = metric;
       bnc->nexthop_num = nexthop_num;
@@ -257,7 +459,10 @@ bgp_parse_nexthop_update (void)
 		  break;
 
 	  if (!oldnh)
-	    bnc->change_flags |= BGP_NEXTHOP_CHANGED;
+	    {
+	      bnc->change_flags |= BGP_NEXTHOP_CHANGED;
+	      UNSET_FLAG(bnc->flags, BGP_NEXTHOP_PEER_NOTIFIED);
+	    }
 	}
       bnc_nexthop_free(bnc);
       bnc->nexthop = nhlist_head;
@@ -265,6 +470,10 @@ bgp_parse_nexthop_update (void)
   else
     {
       bnc->flags &= ~BGP_NEXTHOP_VALID;
+
+      /* notify bgp fsm if nbr ip goes from valid->invalid */
+      UNSET_FLAG(bnc->flags, BGP_NEXTHOP_PEER_NOTIFIED);
+
       bnc_nexthop_free(bnc);
       bnc->nexthop = NULL;
     }
@@ -279,42 +488,69 @@ bgp_parse_nexthop_update (void)
 static int
 make_prefix (int afi, struct bgp_info *ri, struct prefix *p)
 {
+
+  int is_bgp_static = ((ri->type == ZEBRA_ROUTE_BGP) &&
+		       (ri->sub_type == BGP_ROUTE_STATIC)) ? 1 : 0;
+
   memset (p, 0, sizeof (struct prefix));
   switch (afi)
     {
     case AFI_IP:
       p->family = AF_INET;
-      p->prefixlen = IPV4_MAX_BITLEN;
-      p->u.prefix4 = ri->attr->nexthop;
+      if (is_bgp_static)
+	{
+	  p->u.prefix4 = ri->net->p.u.prefix4;
+          p->prefixlen = ri->net->p.prefixlen;
+	}
+      else
+	{
+	  p->u.prefix4 = ri->attr->nexthop;
+          p->prefixlen = IPV4_MAX_BITLEN;
+	}
       break;
 #ifdef HAVE_IPV6
     case AFI_IP6:
+      /* We don't register link local NH */
       if (ri->attr->extra->mp_nexthop_len != 16
 	  || IN6_IS_ADDR_LINKLOCAL (&ri->attr->extra->mp_nexthop_global))
 	return -1;
 
       p->family = AF_INET6;
-      p->prefixlen = IPV6_MAX_BITLEN;
-      p->u.prefix6 = ri->attr->extra->mp_nexthop_global;
+
+      if (is_bgp_static)
+	{
+	  p->u.prefix6 = ri->net->p.u.prefix6;
+	  p->prefixlen = ri->net->p.prefixlen;
+	}
+      else
+	{
+	  p->u.prefix6 = ri->attr->extra->mp_nexthop_global;
+          p->prefixlen = IPV6_MAX_BITLEN;
+	}
       break;
 #endif
     default:
+      if (BGP_DEBUG(nht, NHT))
+	{
+	  zlog_debug("%s: Attempting to make prefix with unknown AFI %d (not %d or %d)",
+		     __FUNCTION__, afi, AFI_IP, AFI_IP6);
+	}
       break;
     }
   return 0;
 }
 
 /**
- * sendmsg_nexthop -- Format and send a nexthop register/Unregister
+ * sendmsg_zebra_rnh -- Format and send a nexthop register/Unregister
  *   command to Zebra.
  * ARGUMENTS:
  *   struct bgp_nexthop_cache *bnc -- the nexthop structure.
- *   int command -- either ZEBRA_NEXTHOP_REGISTER or ZEBRA_NEXTHOP_UNREGISTER
+ *   int command -- command to send to zebra
  * RETURNS:
  *   void.
  */
 static void
-sendmsg_nexthop (struct bgp_nexthop_cache *bnc, int command)
+sendmsg_zebra_rnh (struct bgp_nexthop_cache *bnc, int command)
 {
   struct stream *s;
   struct prefix *p;
@@ -322,12 +558,22 @@ sendmsg_nexthop (struct bgp_nexthop_cache *bnc, int command)
 
   /* Check socket. */
   if (!zclient || zclient->sock < 0)
-    return;
+    {
+      zlog_debug("%s: Can't send NH register, Zebra client not established",
+		 __FUNCTION__);
+      return;
+    }
 
   p = &(bnc->node->p);
   s = zclient->obuf;
   stream_reset (s);
   zclient_create_header (s, command);
+  if (CHECK_FLAG(bnc->flags, BGP_NEXTHOP_CONNECTED) ||
+      CHECK_FLAG(bnc->flags, BGP_STATIC_ROUTE_EXACT_MATCH))
+    stream_putc(s, 1);
+  else
+    stream_putc(s, 0);
+
   stream_putw(s, PREFIX_FAMILY(p));
   stream_putc(s, p->prefixlen);
   switch (PREFIX_FAMILY(p))
@@ -349,43 +595,54 @@ sendmsg_nexthop (struct bgp_nexthop_cache *bnc, int command)
   /* TBD: handle the failure */
   if (ret < 0)
     zlog_warn("sendmsg_nexthop: zclient_send_message() failed");
+
+  if ((command == ZEBRA_NEXTHOP_REGISTER) ||
+      (command == ZEBRA_IMPORT_ROUTE_REGISTER))
+    SET_FLAG(bnc->flags, BGP_NEXTHOP_REGISTERED);
+  else if ((command == ZEBRA_NEXTHOP_UNREGISTER) ||
+	   (command == ZEBRA_IMPORT_ROUTE_UNREGISTER))
+    UNSET_FLAG(bnc->flags, BGP_NEXTHOP_REGISTERED);
   return;
 }
 
 /**
- * register_nexthop - register a nexthop with Zebra for notification
- *    when the route to the nexthop changes.
+ * register_zebra_rnh - register a NH/route with Zebra for notification
+ *    when the route or the route to the nexthop changes.
  * ARGUMENTS:
- *   struct bgp_nexthop_cache *bnc -- the nexthop structure.
+ *   struct bgp_nexthop_cache *bnc
  * RETURNS:
  *   void.
  */
 static void
-register_nexthop (struct bgp_nexthop_cache *bnc)
+register_zebra_rnh (struct bgp_nexthop_cache *bnc, int is_bgp_import_route)
 {
   /* Check if we have already registered */
   if (bnc->flags & BGP_NEXTHOP_REGISTERED)
     return;
-  sendmsg_nexthop(bnc, ZEBRA_NEXTHOP_REGISTER);
-  SET_FLAG(bnc->flags, BGP_NEXTHOP_REGISTERED);
+  if (is_bgp_import_route)
+    sendmsg_zebra_rnh(bnc, ZEBRA_IMPORT_ROUTE_REGISTER);
+  else
+    sendmsg_zebra_rnh(bnc, ZEBRA_NEXTHOP_REGISTER);
 }
 
 /**
- * unregister_nexthop -- Unregister the nexthop from Zebra.
+ * unregister_zebra_rnh -- Unregister the route/nexthop from Zebra.
  * ARGUMENTS:
- *   struct bgp_nexthop_cache *bnc -- the nexthop structure.
+ *   struct bgp_nexthop_cache *bnc
  * RETURNS:
  *   void.
  */
 static void
-unregister_nexthop (struct bgp_nexthop_cache *bnc)
+unregister_zebra_rnh (struct bgp_nexthop_cache *bnc, int is_bgp_import_route)
 {
   /* Check if we have already registered */
   if (!CHECK_FLAG(bnc->flags, BGP_NEXTHOP_REGISTERED))
     return;
 
-  sendmsg_nexthop(bnc, ZEBRA_NEXTHOP_UNREGISTER);
-  UNSET_FLAG(bnc->flags, BGP_NEXTHOP_REGISTERED);
+  if (is_bgp_import_route)
+    sendmsg_zebra_rnh(bnc, ZEBRA_IMPORT_ROUTE_UNREGISTER);
+  else
+    sendmsg_zebra_rnh(bnc, ZEBRA_NEXTHOP_UNREGISTER);
 }
 
 /**
@@ -402,11 +659,13 @@ evaluate_paths (struct bgp_nexthop_cache *bnc)
   struct bgp_info *path;
   struct bgp *bgp = bgp_get_default();
   int afi;
+  struct peer *peer = (struct peer *)bnc->nht_info;
 
   LIST_FOREACH(path, &(bnc->paths), nh_thread)
     {
       if (!(path->type == ZEBRA_ROUTE_BGP &&
-	    path->sub_type == BGP_ROUTE_NORMAL))
+	    (path->sub_type == BGP_ROUTE_NORMAL) ||
+	    (path->sub_type == BGP_ROUTE_STATIC)))
 	continue;
 
       rn = path->net;
@@ -444,6 +703,15 @@ evaluate_paths (struct bgp_nexthop_cache *bnc)
 
       bgp_process(bgp, rn, afi, SAFI_UNICAST);
     }
+
+  if (peer && !CHECK_FLAG(bnc->flags, BGP_NEXTHOP_PEER_NOTIFIED))
+    {
+      if (BGP_DEBUG(nht, NHT))
+	zlog_debug("%s: Updating peer (%s) status with NHT", __FUNCTION__, peer->host);
+      bgp_fsm_nht_update(peer, CHECK_FLAG(bnc->flags, BGP_NEXTHOP_VALID));
+      SET_FLAG(bnc->flags, BGP_NEXTHOP_PEER_NOTIFIED);
+    }
+
   RESET_FLAG(bnc->change_flags);
 }
 

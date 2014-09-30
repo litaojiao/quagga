@@ -1172,7 +1172,7 @@ DEFUN (show_ip_nht,
        IP_STR
        "IP nexthop tracking table\n")
 {
-  zebra_print_rnh_table(0, AF_INET, vty);
+  zebra_print_rnh_table(0, AF_INET, vty, RNH_NEXTHOP_TYPE);
   return CMD_SUCCESS;
 }
 
@@ -1183,7 +1183,7 @@ DEFUN (show_ipv6_nht,
        IP_STR
        "IPv6 nexthop tracking table\n")
 {
-  zebra_print_rnh_table(0, AF_INET6, vty);
+  zebra_print_rnh_table(0, AF_INET6, vty, RNH_NEXTHOP_TYPE);
   return CMD_SUCCESS;
 }
 
@@ -1198,7 +1198,7 @@ DEFUN (ip_nht_default_route,
     return CMD_SUCCESS;
 
   zebra_rnh_ip_default_route = 1;
-  zebra_evaluate_rnh_table(0, AF_INET, 1);
+  zebra_evaluate_rnh_table(0, AF_INET, 1, RNH_NEXTHOP_TYPE);
   return CMD_SUCCESS;
 }
 
@@ -1214,7 +1214,7 @@ DEFUN (no_ip_nht_default_route,
     return CMD_SUCCESS;
 
   zebra_rnh_ip_default_route = 0;
-  zebra_evaluate_rnh_table(0, AF_INET, 1);
+  zebra_evaluate_rnh_table(0, AF_INET, 1, RNH_NEXTHOP_TYPE);
   return CMD_SUCCESS;
 }
 
@@ -1229,7 +1229,7 @@ DEFUN (ipv6_nht_default_route,
     return CMD_SUCCESS;
 
   zebra_rnh_ipv6_default_route = 1;
-  zebra_evaluate_rnh_table(0, AF_INET6, 1);
+  zebra_evaluate_rnh_table(0, AF_INET6, 1, RNH_NEXTHOP_TYPE);
   return CMD_SUCCESS;
 }
 
@@ -1245,7 +1245,7 @@ DEFUN (no_ipv6_nht_default_route,
     return CMD_SUCCESS;
 
   zebra_rnh_ipv6_default_route = 0;
-  zebra_evaluate_rnh_table(0, AF_INET6, 1);
+  zebra_evaluate_rnh_table(0, AF_INET6, 1, RNH_NEXTHOP_TYPE);
   return CMD_SUCCESS;
 }
 
