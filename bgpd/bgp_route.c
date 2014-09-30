@@ -688,12 +688,27 @@ bgp_info_cmp (struct bgp *bgp, struct bgp_info *new, struct bgp_info *exist,
       && exist_sort == BGP_PEER_EBGP)
     {
       if (CHECK_FLAG (new->flags, BGP_INFO_SELECTED))
-	return 1;
+        {
+          if (debug)
+              zlog_debug("%s: path %s wins over path %s due to oldest external",
+                         pfx_buf, new->peer->host, exist->peer->host);
+	  return 1;
+        }
+
       if (CHECK_FLAG (exist->flags, BGP_INFO_SELECTED))
-	return 0;
+        {
+          if (debug)
+              zlog_debug("%s: path %s loses to path %s due to oldest external",
+                         pfx_buf, new->peer->host, exist->peer->host);
+	  return 0;
+        }
     }
 
-  /* 11. Rourter-ID comparision. */
+  /* 11. Router-ID comparision. */
+  /* If one of the paths is "stale", the corresponding peer router-id will
+   * be 0 and would always win over the other path. If originator id is
+   * used for the comparision, it will decide which path is better.
+   */
   if (newattr->flag & ATTR_FLAG_BIT(BGP_ATTR_ORIGINATOR_ID))
     new_id.s_addr = newattre->originator_id.s_addr;
   else
@@ -742,6 +757,25 @@ bgp_info_cmp (struct bgp *bgp, struct bgp_info *new, struct bgp_info *exist,
     }
 
   /* 13. Neighbor address comparision. */
+  /* Do this only if neither path is "stale" as stale paths do not have
+   * valid peer information (as the connection may or may not be up).
+   */
+  if (CHECK_FLAG (exist->flags, BGP_INFO_STALE))
+    {
+      if (debug)
+        zlog_debug("%s: path %s wins over path %s due to latter path being STALE",
+                   pfx_buf, new->peer->host, exist->peer->host);
+      return 1;
+    }
+
+  if (CHECK_FLAG (new->flags, BGP_INFO_STALE))
+    {
+      if (debug)
+        zlog_debug("%s: path %s loses to path %s due to former path being STALE",
+                   pfx_buf, new->peer->host, exist->peer->host);
+      return 0;
+    }
+
   ret = sockunion_cmp (new->peer->su_remote, exist->peer->su_remote);
 
   if (ret == 1)
