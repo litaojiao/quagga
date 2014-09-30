@@ -21,6 +21,14 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #ifndef _QUAGGA_BGP_ADVERTISE_H
 #define _QUAGGA_BGP_ADVERTISE_H
 
+/* BGP advertise FIFO.  */
+struct bgp_advertise_fifo
+{
+  struct bgp_advertise *next;
+  struct bgp_advertise *prev;
+  u_int32_t count;
+};
+
 /* BGP advertise attribute.  */
 struct bgp_advertise_attr
 {
@@ -37,7 +45,7 @@ struct bgp_advertise_attr
 struct bgp_advertise
 {
   /* FIFO for advertisement.  */
-  struct fifo fifo;
+  struct bgp_advertise_fifo fifo;
 
   /* Link list for same attribute advertise.  */
   struct bgp_advertise *next;
@@ -90,12 +98,10 @@ struct bgp_adj_in
 /* BGP advertisement list.  */
 struct bgp_synchronize
 {
-  struct fifo update;
-  struct fifo withdraw;
-  struct fifo withdraw_low;
+  struct bgp_advertise_fifo update;
+  struct bgp_advertise_fifo withdraw;
+  struct bgp_advertise_fifo withdraw_low;
 };
-
-#define BGP_ADV_FIFO_HEAD(F) ((struct bgp_advertise *)FIFO_HEAD(F))
 
 /* BGP adjacency linked list.  */
 #define BGP_INFO_ADD(N,A,TYPE)                        \
@@ -121,6 +127,34 @@ struct bgp_synchronize
 #define BGP_ADJ_IN_DEL(N,A)    BGP_INFO_DEL(N,A,adj_in)
 #define BGP_ADJ_OUT_ADD(N,A)   BGP_INFO_ADD(N,A,adj_out)
 #define BGP_ADJ_OUT_DEL(N,A)   BGP_INFO_DEL(N,A,adj_out)
+
+#define BGP_ADV_FIFO_ADD(F, N)			\
+  do {						\
+    FIFO_ADD((F), (N));				\
+    (F)->count++;				\
+  } while (0)
+
+#define BGP_ADV_FIFO_DEL(F, N)			\
+  do {						\
+    FIFO_DEL((N));				\
+    (F)->count--;				\
+  } while (0)
+
+#define BGP_ADV_FIFO_INIT(F)			\
+  do {						\
+    FIFO_INIT((F));				\
+    (F)->count = 0;				\
+  } while (0)
+
+#define BGP_ADV_FIFO_COUNT(F) \
+  (F)->count
+
+#define BGP_ADV_FIFO_EMPTY(F)			\
+  (((struct bgp_advertise_fifo *)(F))->next == (struct bgp_advertise *)(F))
+
+#define BGP_ADV_FIFO_HEAD(F)                                  \
+  ((((struct bgp_advertise_fifo *)(F))->next == (struct bgp_advertise *)(F)) \
+  ? NULL : (F)->next)
 
 /* Prototypes.  */
 extern void bgp_adj_out_set (struct bgp_node *, struct peer *, struct prefix *,
