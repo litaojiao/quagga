@@ -339,7 +339,7 @@ ospf_zebra_add (struct prefix_ipv4 *p, struct ospf_route *or)
 #endif /* HAVE_NETLINK */
   struct ospf *ospf = ospf_lookup ();
 
-  if (redist_check_instance(&zclient->redist[ZEBRA_ROUTE_OSPF], ospf->instance))
+  if (redist_check_instance(&zclient->redist[AFI_IP][ZEBRA_ROUTE_OSPF], ospf->instance))
     {
       message = 0;
       flags = 0;
@@ -484,7 +484,7 @@ ospf_zebra_delete (struct prefix_ipv4 *p, struct ospf_route *or)
   struct listnode *node;
   struct ospf *ospf = ospf_lookup ();
 
-  if (redist_check_instance(&zclient->redist[ZEBRA_ROUTE_OSPF], ospf->instance))
+  if (redist_check_instance(&zclient->redist[AFI_IP][ZEBRA_ROUTE_OSPF], ospf->instance))
     {
       message = 0;
       flags = 0;
@@ -567,7 +567,7 @@ ospf_zebra_add_discard (struct prefix_ipv4 *p)
   struct zapi_ipv4 api;
   struct ospf *ospf = ospf_lookup ();
 
-  if (redist_check_instance(&zclient->redist[ZEBRA_ROUTE_OSPF], ospf->instance))
+  if (redist_check_instance(&zclient->redist[AFI_IP][ZEBRA_ROUTE_OSPF], ospf->instance))
     {
       api.type = ZEBRA_ROUTE_OSPF;
       api.instance = ospf->instance;
@@ -593,7 +593,7 @@ ospf_zebra_delete_discard (struct prefix_ipv4 *p)
   struct zapi_ipv4 api;
   struct ospf *ospf = ospf_lookup ();
 
-  if (redist_check_instance(&zclient->redist[ZEBRA_ROUTE_OSPF], ospf->instance))
+  if (redist_check_instance(&zclient->redist[AFI_IP][ZEBRA_ROUTE_OSPF], ospf->instance))
     {
       api.type = ZEBRA_ROUTE_OSPF;
       api.instance = ospf->instance;
@@ -742,7 +742,7 @@ ospf_is_type_redistributed (int type, u_short instance)
 {
   return (DEFAULT_ROUTE_TYPE (type) ?
     zclient->default_information :
-    redist_check_instance(&zclient->redist[type], instance));
+    redist_check_instance(&zclient->redist[AFI_IP][type], instance));
 }
 
 int
@@ -782,7 +782,7 @@ ospf_redistribute_set (struct ospf *ospf, int type, u_short instance, int mtype,
 
   ospf_external_add(type, instance);
 
-  zclient_redistribute (ZEBRA_REDISTRIBUTE_ADD, zclient, type, instance);
+  zclient_redistribute (ZEBRA_REDISTRIBUTE_ADD, zclient, AFI_IP, type, instance);
 
   if (IS_DEBUG_OSPF (zebra, ZEBRA_REDISTRIBUTE))
     zlog_debug ("Redistribute[%s][%d]: Start  Type[%d], Metric[%d]",
@@ -803,7 +803,7 @@ ospf_redistribute_unset (struct ospf *ospf, int type, u_short instance)
   if (!ospf_is_type_redistributed (type, instance))
     return CMD_SUCCESS;
 
-  zclient_redistribute (ZEBRA_REDISTRIBUTE_DELETE, zclient, type, instance);
+  zclient_redistribute (ZEBRA_REDISTRIBUTE_DELETE, zclient, AFI_IP, type, instance);
 
   if (IS_DEBUG_OSPF (zebra, ZEBRA_REDISTRIBUTE))
     zlog_debug ("Redistribute[%s][%d]: Stop",

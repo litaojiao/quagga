@@ -9582,7 +9582,7 @@ DEFUN (bgp_redistribute_ipv4,
       return CMD_WARNING;
     }
   bgp_redist_add(vty->index, AFI_IP, type, 0);
-  return bgp_redistribute_set (type, 0);
+  return bgp_redistribute_set (AFI_IP, type, 0);
 }
 
 DEFUN (bgp_redistribute_ipv4_rmap,
@@ -9605,7 +9605,7 @@ DEFUN (bgp_redistribute_ipv4_rmap,
 
   red = bgp_redist_add(vty->index, AFI_IP, type, 0);
   bgp_redistribute_rmap_set (red, argv[1]);
-  return bgp_redistribute_set (type, 0);
+  return bgp_redistribute_set (AFI_IP, type, 0);
 }
 
 DEFUN (bgp_redistribute_ipv4_metric,
@@ -9630,7 +9630,7 @@ DEFUN (bgp_redistribute_ipv4_metric,
 
   red = bgp_redist_add(vty->index, AFI_IP, type, 0);
   bgp_redistribute_metric_set (red, metric);
-  return bgp_redistribute_set (type, 0);
+  return bgp_redistribute_set (AFI_IP, type, 0);
 }
 
 DEFUN (bgp_redistribute_ipv4_rmap_metric,
@@ -9658,7 +9658,7 @@ DEFUN (bgp_redistribute_ipv4_rmap_metric,
   red = bgp_redist_add(vty->index, AFI_IP, type, 0);
   bgp_redistribute_rmap_set (red, argv[1]);
   bgp_redistribute_metric_set (red, metric);
-  return bgp_redistribute_set (type, 0);
+  return bgp_redistribute_set (AFI_IP, type, 0);
 }
 
 DEFUN (bgp_redistribute_ipv4_metric_rmap,
@@ -9686,7 +9686,7 @@ DEFUN (bgp_redistribute_ipv4_metric_rmap,
   red = bgp_redist_add(vty->index, AFI_IP, type, 0);
   bgp_redistribute_metric_set (red, metric);
   bgp_redistribute_rmap_set (red, argv[2]);
-  return bgp_redistribute_set (type, 0);
+  return bgp_redistribute_set (AFI_IP, type, 0);
 }
 
 DEFUN (bgp_redistribute_ipv4_ospf,
@@ -9707,7 +9707,7 @@ DEFUN (bgp_redistribute_ipv4_ospf,
     protocol = ZEBRA_ROUTE_TABLE;
 
   bgp_redist_add(vty->index, AFI_IP, protocol, instance);
-  return bgp_redistribute_set (protocol, instance);
+  return bgp_redistribute_set (AFI_IP, protocol, instance);
 }
 
 DEFUN (bgp_redistribute_ipv4_ospf_rmap,
@@ -9731,7 +9731,7 @@ DEFUN (bgp_redistribute_ipv4_ospf_rmap,
   VTY_GET_INTEGER ("Instance ID", instance, argv[1]);
   red = bgp_redist_add(vty->index, AFI_IP, protocol, instance);
   bgp_redistribute_rmap_set (red, argv[2]);
-  return bgp_redistribute_set (protocol, instance);
+  return bgp_redistribute_set (AFI_IP, protocol, instance);
 }
 
 DEFUN (bgp_redistribute_ipv4_ospf_metric,
@@ -9758,7 +9758,7 @@ DEFUN (bgp_redistribute_ipv4_ospf_metric,
 
   red = bgp_redist_add(vty->index, AFI_IP, protocol, instance);
   bgp_redistribute_metric_set (red, metric);
-  return bgp_redistribute_set (protocol, instance);
+  return bgp_redistribute_set (AFI_IP, protocol, instance);
 }
 
 DEFUN (bgp_redistribute_ipv4_ospf_rmap_metric,
@@ -9788,7 +9788,7 @@ DEFUN (bgp_redistribute_ipv4_ospf_rmap_metric,
   red = bgp_redist_add(vty->index, AFI_IP, protocol, instance);
   bgp_redistribute_rmap_set (red, argv[2]);
   bgp_redistribute_metric_set (red, metric);
-  return bgp_redistribute_set (protocol, instance);
+  return bgp_redistribute_set (AFI_IP, protocol, instance);
 }
 
 DEFUN (bgp_redistribute_ipv4_ospf_metric_rmap,
@@ -9818,7 +9818,7 @@ DEFUN (bgp_redistribute_ipv4_ospf_metric_rmap,
   red = bgp_redist_add(vty->index, AFI_IP, protocol, instance);
   bgp_redistribute_metric_set (red, metric);
   bgp_redistribute_rmap_set (red, argv[3]);
-  return bgp_redistribute_set (protocol, instance);
+  return bgp_redistribute_set (AFI_IP, protocol, instance);
 }
 
 DEFUN (no_bgp_redistribute_ipv4_ospf,
@@ -9960,7 +9960,7 @@ DEFUN (bgp_redistribute_ipv6,
     }
 
   bgp_redist_add(vty->index, AFI_IP6, type, 0);
-  return bgp_redistribute_set (type, 0);
+  return bgp_redistribute_set (AFI_IP6, type, 0);
 }
 
 DEFUN (bgp_redistribute_ipv6_rmap,
@@ -9983,7 +9983,7 @@ DEFUN (bgp_redistribute_ipv6_rmap,
 
   red = bgp_redist_add(vty->index, AFI_IP6, type, 0);
   bgp_redistribute_rmap_set (red, argv[1]);
-  return bgp_redistribute_set (type, 0);
+  return bgp_redistribute_set (AFI_IP6, type, 0);
 }
 
 DEFUN (bgp_redistribute_ipv6_metric,
@@ -10008,7 +10008,7 @@ DEFUN (bgp_redistribute_ipv6_metric,
 
   red = bgp_redist_add(vty->index, AFI_IP6, type, 0);
   bgp_redistribute_metric_set (red, metric);
-  return bgp_redistribute_set (type, 0);
+  return bgp_redistribute_set (AFI_IP6, type, 0);
 }
 
 DEFUN (bgp_redistribute_ipv6_rmap_metric,
@@ -10036,7 +10036,7 @@ DEFUN (bgp_redistribute_ipv6_rmap_metric,
   red = bgp_redist_add(vty->index, AFI_IP6, type, 0);
   bgp_redistribute_rmap_set (red, argv[1]);
   bgp_redistribute_metric_set (red, metric);
-  return bgp_redistribute_set (type, 0);
+  return bgp_redistribute_set (AFI_IP6, type, 0);
 }
 
 DEFUN (bgp_redistribute_ipv6_metric_rmap,
@@ -10064,7 +10064,7 @@ DEFUN (bgp_redistribute_ipv6_metric_rmap,
   red = bgp_redist_add(vty->index, AFI_IP6, type, 0);
   bgp_redistribute_metric_set (red, metric);
   bgp_redistribute_rmap_set (red, argv[2]);
-  return bgp_redistribute_set (type, 0);
+  return bgp_redistribute_set (AFI_IP6, type, 0);
 }
 
 DEFUN (no_bgp_redistribute_ipv6,
