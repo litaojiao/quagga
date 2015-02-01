@@ -145,8 +145,8 @@ bgp_multiaccess_check (afi_t afi, struct bgp_info *ri, struct peer *peer)
 }
 
 int
-bgp_find_or_add_nexthop (afi_t afi, struct bgp_info *ri, struct peer *peer,
-			 int connected)
+bgp_find_or_add_nexthop (struct bgp *bgp, afi_t afi, struct bgp_info *ri,
+                         struct peer *peer, int connected)
 {
   struct bgp_node *rn;
   struct bgp_nexthop_cache *bnc;
@@ -202,6 +202,7 @@ bgp_find_or_add_nexthop (afi_t afi, struct bgp_info *ri, struct peer *peer,
       bnc = bnc_new();
       rn->info = bnc;
       bnc->node = rn;
+      bnc->bgp = bgp;
       bgp_lock_node(rn);
 
       if (BGP_DEBUG(nht, NHT))
@@ -657,7 +658,7 @@ evaluate_paths (struct bgp_nexthop_cache *bnc)
 {
   struct bgp_node *rn;
   struct bgp_info *path;
-  struct bgp *bgp = bgp_get_default();
+  struct bgp *bgp = bnc->bgp;
   int afi;
   struct peer *peer = (struct peer *)bnc->nht_info;
 

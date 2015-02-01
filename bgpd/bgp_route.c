@@ -2738,7 +2738,7 @@ bgp_update_main (struct peer *peer, struct prefix *p, struct attr *attr,
 	  else
 	    connected = 0;
 
-	  if (bgp_find_or_add_nexthop (afi, ri, NULL, connected))
+	  if (bgp_find_or_add_nexthop (bgp, afi, ri, NULL, connected))
 	    bgp_info_set_flag (rn, ri, BGP_INFO_VALID);
 	  else
 	    {
@@ -2794,7 +2794,7 @@ bgp_update_main (struct peer *peer, struct prefix *p, struct attr *attr,
       else
 	connected = 0;
 
-      if (bgp_find_or_add_nexthop (afi, new, NULL, connected))
+      if (bgp_find_or_add_nexthop (bgp, afi, new, NULL, connected))
 	bgp_info_set_flag (rn, new, BGP_INFO_VALID);
       else
 	{
@@ -3881,7 +3881,7 @@ bgp_static_update_rsclient (struct peer *rsclient, struct prefix *p,
 	  /* Nexthop reachability check. */
 	  if (bgp_flag_check (bgp, BGP_FLAG_IMPORT_CHECK))
 	    {
-	      if (bgp_find_or_add_nexthop (afi, ri, NULL, 0))
+	      if (bgp_find_or_add_nexthop (bgp, afi, ri, NULL, 0))
 		bgp_info_set_flag (rn, ri, BGP_INFO_VALID);
 	      else
 		{
@@ -3920,7 +3920,7 @@ bgp_static_update_rsclient (struct peer *rsclient, struct prefix *p,
   /* Nexthop reachability check. */
   if (bgp_flag_check (bgp, BGP_FLAG_IMPORT_CHECK))
     {
-      if (bgp_find_or_add_nexthop (afi, new, NULL, 0))
+      if (bgp_find_or_add_nexthop (bgp, afi, new, NULL, 0))
 	bgp_info_set_flag (rn, new, BGP_INFO_VALID);
       else
 	{
@@ -4049,7 +4049,7 @@ bgp_static_update_main (struct bgp *bgp, struct prefix *p,
 	  /* Nexthop reachability check. */
 	  if (bgp_flag_check (bgp, BGP_FLAG_IMPORT_CHECK))
 	    {
-	      if (bgp_find_or_add_nexthop (afi, ri, NULL, 0))
+	      if (bgp_find_or_add_nexthop (bgp, afi, ri, NULL, 0))
 		bgp_info_set_flag (rn, ri, BGP_INFO_VALID);
 	      else
 		{
@@ -4089,7 +4089,7 @@ bgp_static_update_main (struct bgp *bgp, struct prefix *p,
   /* Nexthop reachability check. */
   if (bgp_flag_check (bgp, BGP_FLAG_IMPORT_CHECK))
     {
-      if (bgp_find_or_add_nexthop (afi, new, NULL, 0))
+      if (bgp_find_or_add_nexthop (bgp, afi, new, NULL, 0))
 	bgp_info_set_flag (rn, new, BGP_INFO_VALID);
       else
 	{
