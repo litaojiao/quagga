@@ -81,7 +81,6 @@ int bgp_event (struct thread *);
 static int bgp_start_timer (struct thread *);
 static int bgp_connect_timer (struct thread *);
 static int bgp_holdtime_timer (struct thread *);
-static int bgp_keepalive_timer (struct thread *);
 
 /* BGP FSM functions. */
 static int bgp_start (struct peer *);
@@ -403,7 +402,7 @@ bgp_holdtime_timer (struct thread *thread)
 }
 
 /* BGP keepalive fire ! */
-static int
+int
 bgp_keepalive_timer (struct thread *thread)
 {
   struct peer *peer;
@@ -418,22 +417,6 @@ bgp_keepalive_timer (struct thread *thread)
   bgp_event (thread); /* bgp_event unlocks peer */
 
   return 0;
-}
-
-static int
-bgp_routeq_empty (struct peer *peer)
-{
-  afi_t afi;
-  safi_t safi;
-
-  for (afi = AFI_IP; afi < AFI_MAX; afi++)
-    for (safi = SAFI_UNICAST; safi < SAFI_MAX; safi++)
-      {
-        if (!FIFO_EMPTY(&peer->sync[afi][safi]->withdraw) ||
-            !FIFO_EMPTY(&peer->sync[afi][safi]->update))
-          return 0;
-      }
-  return 1;
 }
 
 static int
@@ -1327,13 +1310,6 @@ bgp_fsm_open (struct peer *peer)
 static int
 bgp_fsm_keepalive_expire (struct peer *peer)
 {
-  /*
-   * If there are UPDATE messages to send, no need to send keepalive. The
-   * peer will note our progress through the UPDATEs.
-   */
-  if (!bgp_routeq_empty(peer))
-    return 0;
-
   bgp_keepalive_send (peer);
   return 0;
 }

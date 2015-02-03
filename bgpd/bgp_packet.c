@@ -912,6 +912,14 @@ bgp_write (struct thread *thread)
   while (++count < peer->bgp->wpkt_quanta &&
 	 (s = bgp_write_packet (peer)) != NULL);
 
+  /* if we just sent an update, reset the keepalive timer */
+  if (peer->t_keepalive)
+    {
+      BGP_TIMER_OFF (peer->t_keepalive);
+      BGP_TIMER_ON (peer->t_keepalive, bgp_keepalive_timer,
+		    peer->v_keepalive);
+    }
+
   if (bgp_write_proceed (peer))
     BGP_WRITE_ON (peer->t_write, bgp_write, peer->fd);
 
