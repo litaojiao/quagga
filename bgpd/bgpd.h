@@ -176,6 +176,7 @@ struct bgp
 #define BGP_FLAG_RR_ALLOW_OUTBOUND_POLICY (1 << 15)
 #define BGP_FLAG_FORCE_STATIC_PROCESS     (1 << 16)
 #define BGP_FLAG_IMPORT_CHECK_EXACT_MATCH (1 << 17)
+#define BGP_FLAG_MULTIPATH_RELAX_NO_AS_SET (1 << 18)
 
   /* BGP Per AF flags */
   u_int16_t af_flags[AFI_MAX][SAFI_MAX];
