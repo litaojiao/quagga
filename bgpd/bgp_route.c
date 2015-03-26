@@ -7191,7 +7191,10 @@ route_vty_out_detail_header (struct vty *vty, struct bgp *bgp,
 	{
 	  if (! first)
 	    vty_out (vty, "  Advertised to non peer-group peers:%s ", VTY_NEWLINE);
-	  vty_out (vty, " %s", sockunion2str (&peer->su, buf1, SU_ADDRSTRLEN));
+	  if (peer->conf_if)
+                vty_out (vty, " %s", peer->conf_if);
+              else
+		vty_out (vty, " %s", sockunion2str (&peer->su, buf1, SU_ADDRSTRLEN));
 	  first = 1;
 	}
     }
