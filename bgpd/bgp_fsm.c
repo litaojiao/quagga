@@ -116,6 +116,10 @@ peer_xfer_conn(struct peer *from_peer)
   if (!peer || !CHECK_FLAG(peer->flags, PEER_FLAG_CONFIG_NODE))
     return from_peer;
 
+  if (bgp_debug_neighbor_events(peer))
+    zlog_debug ("%s: peer transfer %p fd %d -> %p fd %d)", from_peer->host,
+		from_peer, from_peer->fd, peer, peer->fd);
+
   BGP_WRITE_OFF(peer->t_write);
   BGP_READ_OFF(peer->t_read);
   BGP_WRITE_OFF(from_peer->t_write);
@@ -1173,8 +1177,8 @@ bgp_connect_success (struct peer *peer)
 
   if (bgp_getsockname (peer) < 0)
     {
-      zlog_err ("%s: bgp_getsockname(): failed for peer %s", __FUNCTION__,
-		peer->host);
+      zlog_err ("%s: bgp_getsockname(): failed for peer %s, fd %d", __FUNCTION__,
+		peer->host, peer->fd);
       bgp_notify_send(peer, BGP_NOTIFY_FSM_ERR, 0); /* internal error */
       return -1;
     }
@@ -1276,16 +1280,16 @@ bgp_start (struct peer *peer)
       break;
     case connect_success:
       if (bgp_debug_neighbor_events(peer))
-	zlog_debug ("%s [FSM] Connect immediately success",
-		   peer->host);
+	zlog_debug ("%s [FSM] Connect immediately success, fd %d",
+		   peer->host, peer->fd);
       BGP_EVENT_ADD (peer, TCP_connection_open);
       break;
     case connect_in_progress:
       /* To check nonblocking connect, we wait until socket is
          readable or writable. */
       if (bgp_debug_neighbor_events(peer))
-	zlog_debug ("%s [FSM] Non blocking connect waiting result",
-		   peer->host);
+	zlog_debug ("%s [FSM] Non blocking connect waiting result, fd %d",
+		   peer->host, peer->fd);
       if (peer->fd < 0)
 	{
 	  zlog_err ("bgp_start peer's fd is negative value %d",
@@ -1517,11 +1521,11 @@ bgp_fsm_update (struct peer *peer)
 static int
 bgp_ignore (struct peer *peer)
 {
-  zlog_err ("%s [FSM] Ignoring event %s in state %s, prior events %s, %s",
+  zlog_err ("%s [FSM] Ignoring event %s in state %s, prior events %s, %s, fd %d",
              peer->host, bgp_event_str[peer->cur_event],
 	     LOOKUP (bgp_status_msg, peer->status),
              bgp_event_str[peer->last_event],
-             bgp_event_str[peer->last_major_event]);
+             bgp_event_str[peer->last_major_event], peer->fd);
   return 0;
 }
 
@@ -1529,11 +1533,11 @@ bgp_ignore (struct peer *peer)
 static int
 bgp_fsm_exception (struct peer *peer)
 {
-  zlog_err ("%s [FSM] Unexpected event %s in state %s, prior events %s, %s",
+  zlog_err ("%s [FSM] Unexpected event %s in state %s, prior events %s, %s, fd %d",
              peer->host, bgp_event_str[peer->cur_event],
 	     LOOKUP (bgp_status_msg, peer->status),
              bgp_event_str[peer->last_event],
-             bgp_event_str[peer->last_major_event]);
+             bgp_event_str[peer->last_major_event], peer->fd);
   return(bgp_stop (peer));
 }
 
@@ -1754,10 +1758,10 @@ bgp_event_update (struct peer *peer, int event)
   next = FSM [peer->status -1][event - 1].next_state;
 
   if (bgp_debug_neighbor_events(peer) && peer->status != next)
-    zlog_debug ("%s [FSM] %s (%s->%s)", peer->host,
+    zlog_debug ("%s [FSM] %s (%s->%s), fd %d", peer->host,
 	       bgp_event_str[event],
 	       LOOKUP (bgp_status_msg, peer->status),
-	       LOOKUP (bgp_status_msg, next));
+	       LOOKUP (bgp_status_msg, next), peer->fd);
 
   peer->last_event = peer->cur_event;
   peer->cur_event = event;
@@ -1789,11 +1793,12 @@ bgp_event_update (struct peer *peer, int event)
       /* If we got a return value of -1, that means there was an error, restart
        * the FSM. If the peer structure was deleted
        */
-      zlog_err ("%s [FSM] Failure handling event %s in state %s, prior events %s, %s",
+      zlog_err ("%s [FSM] Failure handling event %s in state %s, "
+                 "prior events %s, %s, fd %d",
                  peer->host, bgp_event_str[peer->cur_event],
 	         LOOKUP (bgp_status_msg, peer->status),
                  bgp_event_str[peer->last_event],
-                 bgp_event_str[peer->last_major_event]);
+                 bgp_event_str[peer->last_major_event], peer->fd);
       bgp_stop (peer);
       bgp_fsm_change_status(peer, Idle);
       bgp_timer_set(peer);
