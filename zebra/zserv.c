@@ -795,7 +795,7 @@ zserv_rnh_register (struct zserv *client, int sock, u_short length,
 	{
 	  zlog_err("rnh_register: Received unknown family type %d\n",
 		   p.family);
-	  return;
+	  return -1;
 	}
       rnh = zebra_add_rnh(&p, 0, type);
       if (type == RNH_NEXTHOP_TYPE)
@@ -874,7 +874,7 @@ zserv_rnh_unregister (struct zserv *client, int sock, u_short length,
 	{
 	  zlog_err("rnh_register: Received unknown family type %d\n",
 		   p.family);
-	  return;
+	  return -1;
 	}
       rnh = zebra_lookup_rnh(&p, 0, type);
       if (rnh)
