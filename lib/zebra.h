@@ -177,6 +177,9 @@ typedef int socklen_t;
 #include <linux/filter.h>
 #else
 #define RT_TABLE_MAIN		0
+#define RT_TABLE_LOCAL          1
+#define RT_TABLE_COMPAT         2
+#define RT_TABLE_UNSPEC         3
 #endif /* HAVE_NETLINK */
 
 #ifdef HAVE_NETDB_H
