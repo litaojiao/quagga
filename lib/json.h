@@ -41,7 +41,8 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #define JSON_VALUE(X) 0
 
 typedef void json_object;
-
+typedef int json_bool;
+ 
 inline json_object *json_object_new_object (void)
 {
   return NULL;
@@ -67,7 +68,7 @@ inline void json_object_object_add (json_object *a, const char *str, json_object
   return;
 }
 
-inline void json_object_pug (json_object *obj)
+inline void json_object_put (json_object *obj)
 {
   return;
 }
@@ -80,6 +81,11 @@ inline char * json_object_to_json_string (json_object *obj)
 inline void json_object_array_add (json_object *obj1, json_object *obj2)
 {
   return;
+}
+
+inline json_object *json_object_new_boolean(json_bool b)
+{
+  return NULL;
 }
 #endif
 
