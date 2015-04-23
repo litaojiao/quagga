@@ -1508,6 +1508,13 @@ if test "${enable_rusage}" != "no"; then
 fi
 
 dnl --------------------------------------
+dnl checking for json library exists
+dnl --------------------------------------
+AC_CHECK_LIB(json, json_object_new_object,
+		   [LIBS="$LIBS -ljson"
+		    AC_DEFINE(HAVE_JSON, 1, Have Json Library)])
+
+dnl --------------------------------------
 dnl checking for clock_time monotonic struct and call
 dnl --------------------------------------
 AC_CHECK_DECL(CLOCK_MONOTONIC,
