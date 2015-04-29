@@ -762,9 +762,6 @@ zserv_rnh_register (struct zserv *client, int sock, u_short length,
   struct prefix p;
   u_short l = 0;
   u_char flags = 0;
-  int force = 0;
-  int do_inet = 0;
-  int do_inet6 = 0;
 
   if (IS_ZEBRA_DEBUG_NHT)
     zlog_debug("rnh_register msg from client %s: length=%d, type=%s\n",
@@ -772,6 +769,8 @@ zserv_rnh_register (struct zserv *client, int sock, u_short length,
 	       (type == RNH_NEXTHOP_TYPE) ? "nexthop" : "route");
 
   s = client->ibuf;
+
+  client->nh_reg_time = quagga_time(NULL);
 
   while (l < length)
     {
@@ -783,13 +782,11 @@ zserv_rnh_register (struct zserv *client, int sock, u_short length,
 	{
 	  p.u.prefix4.s_addr = stream_get_ipv4(s);
 	  l += IPV4_MAX_BYTELEN;
-	  do_inet = 1;
 	}
       else if (p.family == AF_INET6)
 	{
 	  stream_get(&p.u.prefix6, s, IPV6_MAX_BYTELEN);
 	  l += IPV6_MAX_BYTELEN;
-	  do_inet6 = 1;
 	}
       else
 	{
@@ -801,38 +798,22 @@ zserv_rnh_register (struct zserv *client, int sock, u_short length,
       if (type == RNH_NEXTHOP_TYPE)
 	{
 	  if (flags && !CHECK_FLAG(rnh->flags, ZEBRA_NHT_CONNECTED))
-	    {
-	      SET_FLAG(rnh->flags, ZEBRA_NHT_CONNECTED);
-	      force = 1;
-	    }
+	    SET_FLAG(rnh->flags, ZEBRA_NHT_CONNECTED);
 	  else if (!flags && CHECK_FLAG(rnh->flags, ZEBRA_NHT_CONNECTED))
-	    {
-	      UNSET_FLAG(rnh->flags, ZEBRA_NHT_CONNECTED);
-	      force = 1;
-	    }
+	    UNSET_FLAG(rnh->flags, ZEBRA_NHT_CONNECTED);
 	}
       else if (type == RNH_IMPORT_CHECK_TYPE)
 	{
 	  if (flags && !CHECK_FLAG(rnh->flags, ZEBRA_NHT_EXACT_MATCH))
-	    {
-	      force = 1;
-	      SET_FLAG(rnh->flags, ZEBRA_NHT_EXACT_MATCH);
-	    }
+	    SET_FLAG(rnh->flags, ZEBRA_NHT_EXACT_MATCH);
 	  else if (!flags && CHECK_FLAG(rnh->flags, ZEBRA_NHT_EXACT_MATCH))
-	    {
-	      force = 1;
-	      UNSET_FLAG(rnh->flags, ZEBRA_NHT_EXACT_MATCH);
-	    }
+	    UNSET_FLAG(rnh->flags, ZEBRA_NHT_EXACT_MATCH);
 	}
 
-      client->nh_reg_time = quagga_time(NULL);
       zebra_add_rnh_client(rnh, client, type);
+      /* Anything not AF_INET/INET6 has been filtered out above */
+      zebra_evaluate_rnh(0, p.family, 1, type, &p);
     }
-  if (do_inet)
-    zebra_evaluate_rnh_table(0, AF_INET, force, type);
-  if (do_inet6)
-    zebra_evaluate_rnh_table(0, AF_INET6, force, type);
-
   return 0;
 }
 
@@ -845,8 +826,6 @@ zserv_rnh_unregister (struct zserv *client, int sock, u_short length,
   struct stream *s;
   struct prefix p;
   u_short l = 0;
-  u_char flags;
-  u_char exact_match;
 
   if (IS_ZEBRA_DEBUG_NHT)
     zlog_debug("rnh_unregister msg from client %s: length=%d\n",
@@ -856,7 +835,7 @@ zserv_rnh_unregister (struct zserv *client, int sock, u_short length,
 
   while (l < length)
     {
-      flags = stream_getc(s);
+      (void)stream_getc(s);  //Connected or not.  Not used in this function
       p.family = stream_getw(s);
       p.prefixlen = stream_getc(s);
       l += 4;

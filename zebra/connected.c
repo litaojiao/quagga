@@ -77,7 +77,23 @@ connected_announce (struct interface *ifp, struct connected *ifc)
 {
   if (!ifc)
     return;
-  
+
+  if (ifc->address->family == AF_INET)
+    {
+      if ((ifc->anchor = if_anchor_lookup_by_address(ifc->address->u.prefix4)))
+	{
+	  /* found an anchor, so I'm unnumbered */
+	  SET_FLAG (ifc->flags, ZEBRA_IFA_UNNUMBERED);
+	  listnode_add (ifc->anchor->unnumbered, ifc);
+	}
+      else
+	{
+	  /* I'm numbered */
+	  UNSET_FLAG (ifc->flags, ZEBRA_IFA_UNNUMBERED);
+	  ifc->unnumbered = list_new();
+	}
+    }
+
   listnode_add (ifp->connected, ifc);
 
   /* Update interface address information to protocol daemon. */
@@ -220,19 +236,6 @@ connected_add_ipv4 (struct interface *ifp, int flags, struct in_addr *addr,
    * we can safely assume the address is known to the kernel */
   SET_FLAG(ifc->conf, ZEBRA_IFC_QUEUED);
 
-  if (ifc->anchor = if_anchor_lookup_by_address(*addr))
-    {
-      /* found an anchor, so I'm unnumbered */
-      SET_FLAG (ifc->flags, ZEBRA_IFA_UNNUMBERED);
-      listnode_add (ifc->anchor->unnumbered, ifc);
-    }
-  else
-    {
-      /* I'm numbered */
-      UNSET_FLAG (ifc->flags, ZEBRA_IFA_UNNUMBERED);
-      ifc->unnumbered = list_new();
-    }
-
   /* Allocate new connected address. */
   p = prefix_ipv4_new ();
   p->family = AF_INET;
@@ -336,6 +339,7 @@ connected_delete_ipv4_unnumbered (struct connected *ifc)
   if (CHECK_FLAG (ifc->flags, ZEBRA_IFA_UNNUMBERED))
     {
       listnode_delete (ifc->anchor->unnumbered, ifc);
+      ifc->anchor = NULL;
     }
   else /* I'm a numbered interface */
     {
@@ -344,6 +348,7 @@ connected_delete_ipv4_unnumbered (struct connected *ifc)
           new_anchor = listgetdata (listhead (ifc->unnumbered));
           new_anchor->unnumbered = ifc->unnumbered;
           listnode_delete (new_anchor->unnumbered, new_anchor);
+          new_anchor->anchor = NULL;
 
           /* new_anchor changed from unnumbered to numbered, notify clients */
           zebra_interface_address_delete_update (new_anchor->ifp, new_anchor);

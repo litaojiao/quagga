@@ -468,6 +468,7 @@ if_delete_update (struct interface *ifp)
 
 		  UNSET_FLAG (ifc->conf, ZEBRA_IFC_REAL);
 		  UNSET_FLAG (ifc->conf, ZEBRA_IFC_QUEUED);
+		  connected_delete_ipv4_unnumbered(ifc);
 
 		  /* Remove from subnet chain. */
 		  list_delete_node (addr_list, anode);
@@ -1279,19 +1280,6 @@ ip_address_install (struct vty *vty, struct interface *ifp,
       /* Label. */
       if (label)
 	ifc->label = XSTRDUP (MTYPE_CONNECTED_LABEL, label);
-
-      if (ifc->anchor = if_anchor_lookup_by_address(cp.prefix))
-        {
-          /* found an anchor, so I'm unnumbered */
-          SET_FLAG (ifc->flags, ZEBRA_IFA_UNNUMBERED);
-          listnode_add (ifc->anchor->unnumbered, ifc);
-        }
-      else
-        {
-          /* I'm numbered */
-          UNSET_FLAG (ifc->flags, ZEBRA_IFA_UNNUMBERED);
-          ifc->unnumbered = list_new();
-        }
 
       /* Add to linked list. */
       listnode_add (ifp->connected, ifc);

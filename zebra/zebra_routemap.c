@@ -845,7 +845,7 @@ DEFUN (ip_protocol_nht_rmap,
     }
 
   nht_rm[AFI_IP][i] = XSTRDUP (MTYPE_ROUTE_MAP_NAME, argv[1]);
-  zebra_evaluate_rnh_table(0, AF_INET, 1, RNH_NEXTHOP_TYPE);
+  zebra_evaluate_rnh(0, AF_INET, 1, RNH_NEXTHOP_TYPE, NULL);
 
   return CMD_SUCCESS;
 }
@@ -878,7 +878,7 @@ DEFUN (no_ip_protocol_nht_rmap,
     {
       XFREE (MTYPE_ROUTE_MAP_NAME, nht_rm[AFI_IP][i]);
       nht_rm[AFI_IP][i] = NULL;
-      zebra_evaluate_rnh_table(0, AF_INET, 1, RNH_NEXTHOP_TYPE);
+      zebra_evaluate_rnh(0, AF_INET, 1, RNH_NEXTHOP_TYPE, NULL);
     }
   return CMD_SUCCESS;
 }
@@ -943,7 +943,7 @@ DEFUN (ipv6_protocol_nht_rmap,
   if (nht_rm[AFI_IP6][i])
     XFREE (MTYPE_ROUTE_MAP_NAME, nht_rm[AFI_IP6][i]);
   nht_rm[AFI_IP6][i] = XSTRDUP (MTYPE_ROUTE_MAP_NAME, argv[1]);
-  zebra_evaluate_rnh_table(0, AF_INET6, 1, RNH_NEXTHOP_TYPE);
+  zebra_evaluate_rnh(0, AF_INET6, 1, RNH_NEXTHOP_TYPE, NULL);
 
   return CMD_SUCCESS;
 }
@@ -971,12 +971,12 @@ DEFUN (no_ipv6_protocol_nht_rmap,
   if (nht_rm[AFI_IP6][i])
     XFREE (MTYPE_ROUTE_MAP_NAME, nht_rm[AFI_IP6][i]);
 
-  if ((argc == 2 && strcmp(argv[1], nht_rm[AFI_IP][i]) == 0) ||
+  if ((argc == 2 && strcmp(argv[1], nht_rm[AFI_IP6][i]) == 0) ||
       (argc < 2))
     {
-      XFREE (MTYPE_ROUTE_MAP_NAME, nht_rm[AFI_IP][i]);
+      XFREE (MTYPE_ROUTE_MAP_NAME, nht_rm[AFI_IP6][i]);
       nht_rm[AFI_IP6][i] = NULL;
-      zebra_evaluate_rnh_table(0, AF_INET6, 1, RNH_NEXTHOP_TYPE);
+      zebra_evaluate_rnh(0, AF_INET6, 1, RNH_NEXTHOP_TYPE, NULL);
     }
 
   return CMD_SUCCESS;
@@ -1235,6 +1235,7 @@ static struct route_map_rule_cmd route_match_ip_address_prefix_list_cmd =
   route_match_ip_address_prefix_list_free
 };
 
+
 /* `match ip address prefix-len PREFIXLEN' */
 
 static route_map_result_t
@@ -1288,6 +1289,7 @@ static struct route_map_rule_cmd route_match_ip_address_prefix_len_cmd =
   route_match_ip_address_prefix_len_compile,
   route_match_ip_address_prefix_len_free
 };
+
 
 /* `match ip nexthop prefix-len PREFIXLEN' */
 
@@ -1433,7 +1435,7 @@ static struct route_map_rule_cmd route_set_src_cmd =
   route_set_src_compile,
   route_set_src_free,
 };
-
+
 static int
 zebra_route_map_update_timer (struct thread *thread)
 {
@@ -1443,8 +1445,8 @@ zebra_route_map_update_timer (struct thread *thread)
     zlog_debug("Event driven route-map update triggered");
 
   rib_update();
-  zebra_evaluate_rnh_table(0, AF_INET, 1, RNH_NEXTHOP_TYPE);
-  zebra_evaluate_rnh_table(0, AF_INET6, 1, RNH_NEXTHOP_TYPE);
+  zebra_evaluate_rnh(0, AF_INET, 1, RNH_NEXTHOP_TYPE, NULL);
+  zebra_evaluate_rnh(0, AF_INET6, 1, RNH_NEXTHOP_TYPE, NULL);
 
   return (0);
 }
