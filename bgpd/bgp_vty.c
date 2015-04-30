@@ -1131,23 +1131,6 @@ bgp_config_write_maxpaths (struct vty *vty, struct bgp *bgp, afi_t afi,
   return 0;
 }
 
-static int
-bgp_maxmed_admin_apply (struct bgp* bgp, unsigned int med_value)
-{
-  /*Cancel maxmed on-startup if its on */
-  THREAD_TIMER_OFF (bgp->t_maxmed_onstartup);
-  bgp->v_maxmed_onstartup = 0;
-
-  if (!bgp->maxmed_admin || bgp->maxmed_value != med_value)
-    {
-      bgp->maxmed_admin = 1;
-      bgp->maxmed_value = med_value;
-      bgp_maxmed_begin(bgp);
-    }
-
-  return CMD_SUCCESS;
-}
-
 DEFUN (bgp_maxmed_admin,
        bgp_maxmed_admin_cmd,
        "bgp max-med administrative ",
@@ -1156,12 +1139,15 @@ DEFUN (bgp_maxmed_admin,
        "Administratively applied, for an indefinite period\n")
 {
   struct bgp *bgp;
-  unsigned int med_value;
 
   bgp = vty->index;
-  med_value = BGP_MAXMED_VALUE_DEFAULT;
 
-  return bgp_maxmed_admin_apply(bgp, med_value);
+  bgp->v_maxmed_admin = 1;
+  bgp->maxmed_admin_value = BGP_MAXMED_VALUE_DEFAULT;
+
+  bgp_maxmed_update(bgp);
+
+  return CMD_SUCCESS;
 }
 
 DEFUN (bgp_maxmed_admin_medv,
@@ -1173,92 +1159,18 @@ DEFUN (bgp_maxmed_admin_medv,
        "Max MED value to be used\n")
 {
   struct bgp *bgp;
-  unsigned int med_value;
 
   bgp = vty->index;
-  VTY_GET_INTEGER ("max-med administrative med-value", med_value, argv[0]);
 
-  return bgp_maxmed_admin_apply(bgp, med_value);
-}
+  bgp->v_maxmed_admin = 1;
+  VTY_GET_INTEGER ("max-med admin med-value", bgp->maxmed_admin_value, argv[0]);
 
-static int
-bgp_maxmed_onstartup_apply (struct bgp* bgp, unsigned int seconds,
-                            unsigned int med_value)
-{
-  /* Cancel max-med administrative if its on */
-  if (bgp->maxmed_admin)
-    {
-      bgp->maxmed_admin = 0;
-      bgp->maxmed_value = BGP_MAXMED_VALUE_DEFAULT;
-      bgp_maxmed_end(bgp);
-    }
-
-  /*Cancel maxmed on-startup if its active */
-  if (bgp->t_maxmed_onstartup &&
-      (bgp->v_maxmed_onstartup != seconds || bgp->maxmed_value != med_value))
-    {
-      THREAD_TIMER_OFF (bgp->t_maxmed_onstartup);
-      bgp_maxmed_onstartup_end(bgp);
-    }
-
-  bgp->v_maxmed_onstartup = seconds;
-  bgp->maxmed_value = med_value;
+  bgp_maxmed_update(bgp);
 
   return CMD_SUCCESS;
 }
 
-DEFUN (bgp_maxmed_onstartup,
-       bgp_maxmed_onstartup_cmd,
-       "bgp max-med on-startup <5-86400>",
-       BGP_STR
-       "Advertise routes with max-med\n"
-       "Effective on a startup\n"
-       "Time (seconds) period for max-med\n")
-{
-  unsigned int seconds, med_value;
-  struct bgp *bgp;
-
-  bgp = vty->index;
-
-  if (argc != 1)
-    {
-      vty_out (vty, "%% Must supply max-med on-startup period");
-      return CMD_WARNING;
-    }
-
-  VTY_GET_INTEGER ("max-med on-startup period", seconds, argv[0]);
-  med_value = BGP_MAXMED_VALUE_DEFAULT;
-
-  return bgp_maxmed_onstartup_apply(bgp, seconds, med_value);
-}
-
-DEFUN (bgp_maxmed_onstartup_medv,
-       bgp_maxmed_onstartup_medv_cmd,
-       "bgp max-med on-startup <5-86400> <0-4294967294>",
-       BGP_STR
-       "Advertise routes with max-med\n"
-       "Effective on a startup\n"
-       "Time (seconds) period for max-med\n"
-       "Max MED value to be used\n")
-{
-  unsigned int seconds, med_value;
-  struct bgp *bgp;
-
-  bgp = vty->index;
-
-  if (argc != 2)
-    {
-      vty_out (vty, "%% Must supply max-med on-startup period and med value");
-      return CMD_WARNING;
-    }
-
-  VTY_GET_INTEGER ("max-med on-startup period", seconds, argv[0]);
-  VTY_GET_INTEGER ("max-med on-startup med-value", med_value, argv[1]);
-
-  return bgp_maxmed_onstartup_apply(bgp, seconds, med_value);
-}
-
-DEFUN (no_bgp_maxmed,
+DEFUN (no_bgp_maxmed_admin,
        no_bgp_maxmed_admin_cmd,
        "no bgp max-med administrative",
        NO_STR
@@ -1270,24 +1182,15 @@ DEFUN (no_bgp_maxmed,
 
   bgp = vty->index;
 
-  /* Cancel max-med administrative if its on */
-  if (bgp->maxmed_admin)
-    {
-      bgp->maxmed_admin = 0;
-      bgp_maxmed_end(bgp);
-    }
+  bgp->v_maxmed_admin = BGP_MAXMED_ADMIN_UNCONFIGURED;
+  bgp->maxmed_admin_value = BGP_MAXMED_VALUE_DEFAULT;
 
-  /* Cancel max-med on-startup */
-  if (bgp->t_maxmed_onstartup)
-    bgp_maxmed_onstartup_end(bgp);
-
-  bgp->v_maxmed_onstartup = BGP_MAXMED_ONSTARTUP_UNCONFIGURED;
-  bgp->maxmed_value = BGP_MAXMED_VALUE_DEFAULT;
+  bgp_maxmed_update(bgp);
 
   return CMD_SUCCESS;
 }
 
-ALIAS (no_bgp_maxmed,
+ALIAS (no_bgp_maxmed_admin,
        no_bgp_maxmed_admin_medv_cmd,
        "no bgp max-med administrative <0-4294967294>",
        NO_STR
@@ -1296,8 +1199,89 @@ ALIAS (no_bgp_maxmed,
        "Administratively applied, for an indefinite period\n"
        "Max MED value to be used\n")
 
-ALIAS (no_bgp_maxmed,
+
+DEFUN (bgp_maxmed_onstartup,
+       bgp_maxmed_onstartup_cmd,
+       "bgp max-med on-startup <5-86400>",
+       BGP_STR
+       "Advertise routes with max-med\n"
+       "Effective on a startup\n"
+       "Time (seconds) period for max-med\n")
+{
+  struct bgp *bgp;
+
+  bgp = vty->index;
+
+  if (argc != 1)
+    {
+      vty_out (vty, "%% Must supply max-med on-startup period");
+      return CMD_WARNING;
+    }
+
+  VTY_GET_INTEGER ("max-med on-startup period", bgp->v_maxmed_onstartup, argv[0]);
+  bgp->maxmed_onstartup_value = BGP_MAXMED_VALUE_DEFAULT;
+
+  bgp_maxmed_update(bgp);
+
+  return CMD_SUCCESS;
+}
+
+DEFUN (bgp_maxmed_onstartup_medv,
+       bgp_maxmed_onstartup_medv_cmd,
+       "bgp max-med on-startup <5-86400> <0-4294967294>",
+       BGP_STR
+       "Advertise routes with max-med\n"
+       "Effective on a startup\n"
+       "Time (seconds) period for max-med\n"
+       "Max MED value to be used\n")
+{
+  struct bgp *bgp;
+
+  bgp = vty->index;
+
+  if (argc != 2)
+    {
+      vty_out (vty, "%% Must supply max-med on-startup period and med value");
+      return CMD_WARNING;
+    }
+
+  VTY_GET_INTEGER ("max-med on-startup period", bgp->v_maxmed_onstartup, argv[0]);
+  VTY_GET_INTEGER ("max-med on-startup med-value", bgp->maxmed_onstartup_value, argv[1]);
+
+  bgp_maxmed_update(bgp);
+
+  return CMD_SUCCESS;
+}
+
+DEFUN (no_bgp_maxmed_onstartup,
        no_bgp_maxmed_onstartup_cmd,
+       "no bgp max-med on-startup",
+       NO_STR
+       BGP_STR
+       "Advertise routes with max-med\n"
+       "Effective on a startup\n")
+{
+  struct bgp *bgp;
+
+  bgp = vty->index;
+
+  /* Cancel max-med onstartup if its on */
+  if (bgp->t_maxmed_onstartup)
+    {
+      THREAD_TIMER_OFF (bgp->t_maxmed_onstartup);
+      bgp->maxmed_onstartup_over = 1;
+    }
+
+  bgp->v_maxmed_onstartup = BGP_MAXMED_ONSTARTUP_UNCONFIGURED;
+  bgp->maxmed_onstartup_value = BGP_MAXMED_VALUE_DEFAULT;
+
+  bgp_maxmed_update(bgp);
+
+  return CMD_SUCCESS;
+}
+
+ALIAS (no_bgp_maxmed_onstartup,
+       no_bgp_maxmed_onstartup_period_cmd,
        "no bgp max-med on-startup <5-86400>",
        NO_STR
        BGP_STR
@@ -1305,8 +1289,8 @@ ALIAS (no_bgp_maxmed,
        "Effective on a startup\n"
        "Time (seconds) period for max-med\n")
 
-ALIAS (no_bgp_maxmed,
-       no_bgp_maxmed_onstartup_medv_cmd,
+ALIAS (no_bgp_maxmed_onstartup,
+       no_bgp_maxmed_onstartup_period_medv_cmd,
        "no bgp max-med on-startup <5-86400> <0-4294967294>",
        NO_STR
        BGP_STR
@@ -8073,6 +8057,8 @@ bgp_show_summary (struct vty *vty, struct bgp *bgp, int afi, int safi, u_char us
                 {
                   if (bgp_maxmed_onstartup_configured(bgp) && bgp->maxmed_active)
                     json_object_object_add(json, "max-med-on-startup", json_boolean_true);
+                  if (bgp->v_maxmed_admin)
+                    json_object_object_add(json, "max-med-administrative", json_boolean_true);
 
                   ents = bgp_table_count (bgp->rib[afi][safi]);
                   json_int = json_object_new_int(ents);
@@ -8109,6 +8095,8 @@ bgp_show_summary (struct vty *vty, struct bgp *bgp, int afi, int safi, u_char us
                 {
                   if (bgp_maxmed_onstartup_configured(bgp) && bgp->maxmed_active)
                     vty_out (vty, "Max-med on-startup active%s", VTY_NEWLINE);
+                  if (bgp->v_maxmed_admin)
+                    vty_out (vty, "Max-med administrative active%s", VTY_NEWLINE);
 
                   ents = bgp_table_count (bgp->rib[afi][safi]);
                   vty_out (vty, "RIB entries %ld, using %s of memory%s", ents,
@@ -10663,8 +10651,9 @@ bgp_vty_init (void)
   install_element (BGP_NODE, &no_bgp_maxmed_admin_medv_cmd);
   install_element (BGP_NODE, &bgp_maxmed_onstartup_cmd);
   install_element (BGP_NODE, &no_bgp_maxmed_onstartup_cmd);
+  install_element (BGP_NODE, &no_bgp_maxmed_onstartup_period_cmd);
   install_element (BGP_NODE, &bgp_maxmed_onstartup_medv_cmd);
-  install_element (BGP_NODE, &no_bgp_maxmed_onstartup_medv_cmd);
+  install_element (BGP_NODE, &no_bgp_maxmed_onstartup_period_medv_cmd);
 
   /* bgp update-delay command */
   install_element (BGP_NODE, &bgp_update_delay_cmd);

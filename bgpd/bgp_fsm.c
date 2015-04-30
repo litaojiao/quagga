@@ -738,34 +738,38 @@ bgp_maxmed_onstartup_active (struct bgp *bgp)
 }
 
 void
-bgp_maxmed_begin(struct bgp *bgp)
+bgp_maxmed_update (struct bgp *bgp)
 {
   struct listnode *node, *nnode;
   struct peer *peer;
+  u_char     maxmed_active;
+  u_int32_t  maxmed_value;
 
-  bgp->maxmed_active = 1;
+  if (bgp->v_maxmed_admin)
+    {
+      maxmed_active = 1;
+      maxmed_value = bgp->maxmed_admin_value;
+    }
+  else if (bgp->t_maxmed_onstartup)
+    {
+      maxmed_active = 1;
+      maxmed_value = bgp->maxmed_onstartup_value;
+    }
+  else
+    {
+      maxmed_active = 0;
+      maxmed_value = BGP_MAXMED_VALUE_DEFAULT;
+    }
 
-  for (ALL_LIST_ELEMENTS (bgp->peer, node, nnode, peer))
-    bgp_announce_route_all (peer);
-}
+  if (bgp->maxmed_active != maxmed_active ||
+      bgp->maxmed_value != maxmed_value)
+    {
+      bgp->maxmed_active = maxmed_active;
+      bgp->maxmed_value = maxmed_value;
 
-void
-bgp_maxmed_end (struct bgp *bgp)
-{
-  struct listnode *node, *nnode;
-  struct peer *peer;
-
-  bgp->maxmed_active = 0;
-
-  for (ALL_LIST_ELEMENTS (bgp->peer, node, nnode, peer))
-    bgp_announce_route_all (peer);
-}
-
-void
-bgp_maxmed_onstartup_end (struct bgp *bgp)
-{
-  bgp->maxmed_onstartup_over = 1;
-  bgp_maxmed_end(bgp);
+      for (ALL_LIST_ELEMENTS (bgp->peer, node, nnode, peer))
+        bgp_announce_route_all (peer);
+    }
 }
 
 /* The maxmed onstartup timer expiry callback. */
@@ -778,7 +782,9 @@ bgp_maxmed_onstartup_timer (struct thread *thread)
 
   bgp = THREAD_ARG (thread);
   THREAD_TIMER_OFF (bgp->t_maxmed_onstartup);
-  bgp_maxmed_onstartup_end(bgp);
+  bgp->maxmed_onstartup_over = 1;
+
+  bgp_maxmed_update(bgp);
 
   return 0;
 }
@@ -787,7 +793,7 @@ static void
 bgp_maxmed_onstartup_begin (struct bgp *bgp)
 {
   /* Applicable only once in the process lifetime on the startup */
-  if (bgp->maxmed_onstartup_over || bgp->maxmed_active)
+  if (bgp->maxmed_onstartup_over)
     return;
 
   zlog_info ("Begin maxmed onstartup mode - timer %d seconds",
@@ -797,7 +803,13 @@ bgp_maxmed_onstartup_begin (struct bgp *bgp)
                    bgp_maxmed_onstartup_timer,
                    bgp, bgp->v_maxmed_onstartup);
 
-  bgp->maxmed_active = 1;
+  if (!bgp->v_maxmed_admin)
+    {
+      bgp->maxmed_active = 1;
+      bgp->maxmed_value = bgp->maxmed_onstartup_value;
+    }
+
+  /* Route announce to all peers should happen after this in bgp_establish() */
 }
 
 static void
