@@ -43,50 +43,15 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 typedef void json_object;
 typedef int json_bool;
  
-inline json_object *json_object_new_object (void)
-{
-  return NULL;
-}
-
-inline json_object *json_object_new_array (void)
-{
-  return NULL;
-}
-
-inline json_object *json_object_new_int (int value)
-{
-  return NULL;
-}
-
-inline json_object *json_object_new_string (const char *str)
-{
-  return NULL;
-}
-
-inline void json_object_object_add (json_object *a, const char *str, json_object *b)
-{
-  return;
-}
-
-inline void json_object_put (json_object *obj)
-{
-  return;
-}
-
-inline char * json_object_to_json_string (json_object *obj)
-{
-  return NULL;
-}
-
-inline void json_object_array_add (json_object *obj1, json_object *obj2)
-{
-  return;
-}
-
-inline json_object *json_object_new_boolean(json_bool b)
-{
-  return NULL;
-}
+json_object *json_object_new_object (void);
+json_object *json_object_new_array (void);
+json_object *json_object_new_int (int value);
+json_object *json_object_new_string (const char *str);
+void json_object_object_add (json_object *a, const char *str, json_object *b);
+void json_object_put (json_object *obj);
+char * json_object_to_json_string (json_object *obj);
+void json_object_array_add (json_object *obj1, json_object *obj2);
+json_object *json_object_new_boolean(json_bool b);
 #endif
 
 #endif
