@@ -2796,6 +2796,10 @@ bgp_maximum_prefix_overflow (struct peer *peer, afi_t afi,
                                   BGP_NOTIFY_CEASE_MAX_PREFIX, ndata, 7);
       }
 
+      /* Dynamic peers will just close their connection. */
+      if (peer_dynamic_neighbor (peer))
+        return 1;
+
       /* restart timer start */
       if (peer->pmax_restart[afi][safi])
 	{
@@ -8004,6 +8008,7 @@ bgp_show_table (struct vty *vty, struct bgp_table *table, struct in_addr *router
   char buf[BUFSIZ];
   char buf2[BUFSIZ];
   json_object *json;
+  json_object *json_int;
   json_object *json_paths;
   json_object *json_routes;
   json_object *json_string;
@@ -8011,6 +8016,9 @@ bgp_show_table (struct vty *vty, struct bgp_table *table, struct in_addr *router
   if (use_json)
     {
       json = json_object_new_object();
+
+      json_int = json_object_new_int(table->version);
+      json_object_object_add(json, "table-version", json_int);
 
       json_string = json_object_new_string(inet_ntoa (*router_id));
       json_object_object_add(json, "router-id", json_string);
