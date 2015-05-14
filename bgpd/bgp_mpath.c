@@ -28,6 +28,7 @@
 #include "linklist.h"
 #include "sockunion.h"
 #include "memory.h"
+#include "queue.h"
 
 #include "bgpd/bgpd.h"
 #include "bgpd/bgp_table.h"

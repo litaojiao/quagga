@@ -92,59 +92,6 @@ bgp_unlink_nexthop (struct bgp_info *path)
 }
 
 int
-bgp_multiaccess_check (afi_t afi, struct bgp_info *ri, struct peer *peer)
-{
-  struct bgp_node *rn1, *rn2;
-  struct prefix p;
-  int ret;
-  struct bgp_nexthop_cache *bnc1, *bnc2;
-
-  if (make_prefix(afi, ri, &p) < 0)
-    return 0;
-
-  rn1 = bgp_node_lookup (bgp_nexthop_cache_table[afi], &p);
-  if (!rn1)
-    return 0;
-
-  if (afi == AFI_IP)
-    {
-      p.family = AF_INET;
-      p.prefixlen = IPV4_MAX_BITLEN;
-      p.u.prefix4 = peer->su.sin.sin_addr;
-    }
-  else if (afi == AFI_IP6)
-    {
-      p.family = AF_INET6;
-      p.prefixlen = IPV6_MAX_BITLEN;
-      p.u.prefix6 = peer->su.sin6.sin6_addr;
-    }
-
-  rn2 = bgp_node_lookup (bgp_nexthop_cache_table[afi], &p);
-  if (!rn2)
-    {
-      bgp_unlock_node(rn1);
-      return 0;
-    }
-
-  bnc1 = rn1->info;
-  bnc1 = rn2->info;
-
-  ret = (rn1 == rn2) ? 1 : 0;
-
-  /* if entries match, ensure that they're connected entries */
-  if (bnc1 && CHECK_FLAG(bnc1->flags, BGP_NEXTHOP_CONNECTED) &&
-      bnc2 && CHECK_FLAG(bnc2->flags, BGP_NEXTHOP_CONNECTED))
-    ret = ret ? 1 : 0;
-  else
-    ret = 0;
-
-  bgp_unlock_node(rn1);
-  bgp_unlock_node(rn2);
-
-  return (ret);
-}
-
-int
 bgp_find_or_add_nexthop (struct bgp *bgp, afi_t afi, struct bgp_info *ri,
                          struct peer *peer, int connected)
 {

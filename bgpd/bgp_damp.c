@@ -26,6 +26,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #include "command.h"
 #include "log.h"
 #include "thread.h"
+#include "queue.h"
 #include "json.h"
 
 #include "bgpd/bgpd.h"

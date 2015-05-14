@@ -31,6 +31,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #include "hash.h"
 #include "jhash.h"
 #include "nexthop.h"
+#include "queue.h"
 
 #include "bgpd/bgpd.h"
 #include "bgpd/bgp_table.h"
@@ -385,6 +386,41 @@ bgp_nexthop_self (struct attr *attr)
     return 1;
 
   return 0;
+}
+
+int
+bgp_multiaccess_check_v4 (struct in_addr nexthop, struct peer *peer)
+{
+  struct bgp_node *rn1;
+  struct bgp_node *rn2;
+  struct prefix p;
+  int ret;
+
+  p.family = AF_INET;
+  p.prefixlen = IPV4_MAX_BITLEN;
+  p.u.prefix4 = nexthop;
+
+  rn1 = bgp_node_match (bgp_connected_table[AFI_IP], &p);
+  if (!rn1)
+    return 0;
+
+  p.family = AF_INET;
+  p.prefixlen = IPV4_MAX_BITLEN;
+  p.u.prefix4 = peer->su.sin.sin_addr;
+
+  rn2 = bgp_node_match (bgp_connected_table[AFI_IP], &p);
+  if (!rn2)
+    {
+      bgp_unlock_node(rn1);
+      return 0;
+    }
+
+  ret = (rn1 == rn2) ? 1 : 0;
+
+  bgp_unlock_node(rn1);
+  bgp_unlock_node(rn2);
+
+  return (ret);
 }
 
 static int
