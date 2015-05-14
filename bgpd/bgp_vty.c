@@ -8183,6 +8183,9 @@ bgp_show_summary (struct vty *vty, struct bgp *bgp, int afi, int safi, u_char us
             }
           else
             {
+	      len = vty_out (vty, "%s", peer->host);
+              len = 16 - len;
+
               if (len < 1)
                 vty_out (vty, "%s%*s", VTY_NEWLINE, 16, " ");
               else
