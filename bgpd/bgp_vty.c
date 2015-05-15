@@ -8277,6 +8277,23 @@ DEFUN (show_bgp_memory,
   return CMD_SUCCESS;
 }
 
+static int
+bgp_adj_out_count (struct peer *peer, int afi, int safi)
+{
+  struct bgp_table *table;
+  struct bgp_node *rn;
+  int count = 0;
+
+  if (!peer) return(0);
+
+  table = peer->bgp->rib[afi][safi];
+  if (!table) return(0);
+  for (rn = bgp_table_top(table); rn; rn = bgp_route_next(rn))
+    if (bgp_adj_out_lookup(peer, NULL, afi, safi, rn))
+	count++;
+  return (count);
+}
+
 /* Show BGP peer's summary information. */
 static int
 bgp_show_summary (struct vty *vty, struct bgp *bgp, int afi, int safi, u_char use_json)
@@ -8538,6 +8555,9 @@ bgp_show_summary (struct vty *vty, struct bgp *bgp, int afi, int safi, u_char us
 
               json_int = json_object_new_int(peer->pcount[afi][safi]);
               json_object_object_add(json_peer, "prefix-received-count", json_int);
+
+              json_int = json_object_new_int(bgp_adj_out_count(peer, afi, safi));
+              json_object_object_add(json_peer, "prefix-advertised-count", json_int);
 
               if (CHECK_FLAG (peer->flags, PEER_FLAG_SHUTDOWN))
                 json_string = json_object_new_string("Idle (Admin)");
