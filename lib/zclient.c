@@ -844,6 +844,10 @@ zebra_interface_if_set_value (struct stream *s, struct interface *ifp)
 
   /* Read interface's value. */
   ifp->flags = stream_getq (s);
+#if defined(HAVE_PTM)
+  ifp->ptm_enable = stream_getc (s);
+  ifp->ptm_status = stream_getc (s);
+#endif
   ifp->metric = stream_getl (s);
   ifp->mtu = stream_getl (s);
   ifp->mtu6 = stream_getl (s);

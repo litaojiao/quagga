@@ -359,8 +359,15 @@ zebra_interface_up_update (struct interface *ifp)
   if (IS_ZEBRA_DEBUG_EVENT)
     zlog_debug ("MESSAGE: ZEBRA_INTERFACE_UP %s", ifp->name);
 
+#if defined(HAVE_PTM)
+  if (ifp->ptm_status || !ifp->ptm_enable) {
+    for (ALL_LIST_ELEMENTS (zebrad.client_list, node, nnode, client))
+      zsend_interface_update (ZEBRA_INTERFACE_UP, client, ifp);
+  }
+#else
   for (ALL_LIST_ELEMENTS (zebrad.client_list, node, nnode, client))
     zsend_interface_update (ZEBRA_INTERFACE_UP, client, ifp);
+#endif
 }
 
 /* Interface down information. */

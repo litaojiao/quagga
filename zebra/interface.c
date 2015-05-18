@@ -40,6 +40,9 @@
 #include "zebra/redistribute.h"
 #include "zebra/debug.h"
 #include "zebra/irdp.h"
+#if defined(HAVE_PTM)
+#include "zebra/zebra_ptm.h"
+#endif
 
 #ifdef RTADV
 /* Order is intentional.  Matches RFC4191.  This array is also used for
@@ -58,6 +61,9 @@ if_zebra_new_hook (struct interface *ifp)
   zebra_if->multicast = IF_ZEBRA_MULTICAST_UNSPEC;
   zebra_if->shutdown = IF_ZEBRA_SHUTDOWN_OFF;
 
+#if defined(HAVE_PTM)
+  ifp->ptm_enable = ptm_enable;
+#endif
 #ifdef RTADV
   {
     /* Set default router advertise values. */
@@ -260,8 +266,8 @@ void
 if_flags_update (struct interface *ifp, uint64_t newflags)
 {
   if_flags_mangle (ifp, &newflags);
-    
-  if (if_is_operative (ifp))
+ 
+  if (if_is_operative_no_ptm (ifp))
     {
       /* operative -> inoperative? */
       ifp->flags = newflags;
@@ -534,6 +540,13 @@ if_up (struct interface *ifp)
   struct prefix *p;
 
   /* Notify the protocol daemons. */
+#if defined(HAVE_PTM)
+  if (ifp->ptm_enable && !ifp->ptm_status) {
+    zlog_warn("%s: interface %s hasn't passed ptm check\n", __func__,
+	      ifp->name);
+    return;
+  }
+#endif
   zebra_interface_up_update (ifp);
 
   /* Install connected routes to the kernel. */
@@ -745,6 +758,19 @@ if_dump_vty (struct vty *vty, struct interface *ifp)
   } else {
     vty_out (vty, "down%s", VTY_NEWLINE);
   }
+
+#if defined(HAVE_PTM)
+  vty_out (vty, "  PTM status: ");
+  if (ifp->ptm_enable) {
+    if (ifp->ptm_status) {
+      vty_out (vty, "pass%s", VTY_NEWLINE);
+    } else {
+      vty_out (vty, "fail%s", VTY_NEWLINE);
+    }
+  } else {
+    vty_out (vty, "disabled%s", VTY_NEWLINE);
+  }
+#endif
 
   if (ifp->desc)
     vty_out (vty, "  Description: %s%s", ifp->desc,
@@ -1083,12 +1109,11 @@ DEFUN (linkdetect,
   int if_was_operative;
   
   ifp = (struct interface *) vty->index;
-  if_was_operative = if_is_operative(ifp);
+  if_was_operative = if_is_operative_no_ptm(ifp);
   SET_FLAG(ifp->status, ZEBRA_INTERFACE_LINKDETECTION);
 
   /* When linkdetection is enabled, if might come down */
-  if (!if_is_operative(ifp) && if_was_operative) if_down(ifp);
-
+  if (!if_is_operative_no_ptm(ifp) && if_was_operative) if_down(ifp);
   /* FIXME: Will defer status change forwarding if interface
      does not come down! */
 
@@ -1106,7 +1131,7 @@ DEFUN (no_linkdetect,
   int if_was_operative;
 
   ifp = (struct interface *) vty->index;
-  if_was_operative = if_is_operative(ifp);
+  if_was_operative = if_is_operative_no_ptm(ifp);
   UNSET_FLAG(ifp->status, ZEBRA_INTERFACE_LINKDETECTION);
   
   /* Interface may come up after disabling link detection */
@@ -1585,6 +1610,10 @@ if_config_write (struct vty *vty)
 {
   struct listnode *node;
   struct interface *ifp;
+
+#if defined(HAVE_PTM)
+  zebra_ptm_write (vty);
+#endif
 
   for (ALL_LIST_ELEMENTS_RO (iflist, node, ifp))
     {

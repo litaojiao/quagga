@@ -1109,12 +1109,12 @@ netlink_link_change (struct sockaddr_nl *snl, struct nlmsghdr *h)
 
           netlink_interface_update_hw_addr (tb, ifp);
 
-          if (if_is_operative (ifp))
+          if (if_is_operative_no_ptm (ifp))
             {
               ifp->flags = ifi->ifi_flags & 0x0000fffff;
-              if (!if_is_operative (ifp))
+              if (!if_is_operative_no_ptm (ifp))
                 if_down (ifp);
-	      else
+	      else if (if_is_operative (ifp))
 		/* Must notify client daemons of new interface status. */
 	        zebra_interface_up_update (ifp);
             }

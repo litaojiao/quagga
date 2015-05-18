@@ -40,6 +40,9 @@
 #include "zebra/irdp.h"
 #include "zebra/rtadv.h"
 #include "zebra/zebra_fpm.h"
+#if defined(HAVE_PTM)
+#include "zebra/zebra_ptm.h"
+#endif
 
 /* Zebra instance */
 struct zebra_t zebrad =
@@ -333,6 +336,10 @@ main (int argc, char **argv)
 #endif
 #ifdef HAVE_IRDP
   irdp_init();
+#endif
+  /* PTM socket */
+#if defined(HAVE_PTM)
+  zebra_ptm_init();
 #endif
 
   /* For debug purpose. */

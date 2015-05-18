@@ -38,6 +38,9 @@
 
 /* Master list of interfaces. */
 struct list *iflist;
+#if defined(HAVE_PTM)
+int ptm_enable = 0;
+#endif
 
 /* One for each program.  This structure is needed to store hooks. */
 struct if_master
@@ -400,12 +403,33 @@ if_is_running (struct interface *ifp)
 }
 
 /* Is the interface operative, eg. either UP & RUNNING
-   or UP & !ZEBRA_INTERFACE_LINK_DETECTION */
+   or UP & !ZEBRA_INTERFACE_LINK_DETECTION and
+   if ptm checking is enabled, then ptm check has passed */
 int
 if_is_operative (struct interface *ifp)
 {
+#if defined(HAVE_PTM)
+  return ((ifp->flags & IFF_UP) &&
+	  (((ifp->flags & IFF_RUNNING) &&
+	    (ifp->ptm_status || !ifp->ptm_enable)) ||
+	   !CHECK_FLAG(ifp->status, ZEBRA_INTERFACE_LINKDETECTION)));
+#else
   return ((ifp->flags & IFF_UP) &&
 	  (ifp->flags & IFF_RUNNING || !CHECK_FLAG(ifp->status, ZEBRA_INTERFACE_LINKDETECTION)));
+#endif
+}
+
+/* Is the interface operative, eg. either UP & RUNNING
+   or UP & !ZEBRA_INTERFACE_LINK_DETECTION, without PTM check
+   This behaves the same as the original if_is_operative but the distinction
+   is that when we need if_is_operative with PTM checking it will work 
+   that way */
+int
+if_is_operative_no_ptm (struct interface *ifp)
+{
+  return ((ifp->flags & IFF_UP) &&
+	  ((ifp->flags & IFF_RUNNING) ||
+	   !CHECK_FLAG(ifp->status, ZEBRA_INTERFACE_LINKDETECTION)));
 }
 
 /* Is this loopback interface ? */
