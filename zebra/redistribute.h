@@ -46,7 +46,9 @@ extern void zebra_interface_address_add_update (struct interface *,
 					 	struct connected *);
 extern void zebra_interface_address_delete_update (struct interface *,
 						   struct connected *c);
-
+#if defined(HAVE_BFD)
+extern void zebra_interface_bfd_update (struct interface *, struct prefix *);
+#endif
 extern int zebra_check_addr (struct prefix *);
 
 extern int zebra_import_table (afi_t afi, u_int32_t table_id,

@@ -436,8 +436,12 @@ struct in_pktinfo
 #define ZEBRA_IMPORT_ROUTE_REGISTER       29
 #define ZEBRA_IMPORT_ROUTE_UNREGISTER     30
 #define ZEBRA_IMPORT_CHECK_UPDATE         31
+#if !defined(HAVE_BFD)
 #define ZEBRA_MESSAGE_MAX                 32
-
+#else
+#define ZEBRA_INTERFACE_BFD_DEST_DOWN    29
+#define ZEBRA_MESSAGE_MAX                30
+#endif
 /* Marker value used in new Zserv, in the byte location corresponding
  * the command value in the old zserv header. To allow old and new
  * Zserv headers to be distinguished from each other.

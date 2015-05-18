@@ -595,6 +595,9 @@ struct peer
 #define PEER_FLAG_LOCAL_AS_REPLACE_AS       (1 << 8) /* local-as no-prepend replace-as */
 #define PEER_FLAG_DELETE		    (1 << 9) /* mark the peer for deleting */
 #define PEER_FLAG_CONFIG_NODE		    (1 << 10) /* the node to update configs on */
+#if defined(HAVE_BFD)
+#define PEER_FLAG_BFD                       (1 << 11) /* bfd */
+#endif
 #define PEER_FLAG_LONESOUL                  (1 << 12)
 #define PEER_FLAG_DYNAMIC_NEIGHBOR          (1 << 13) /* dynamic neighbor */
 

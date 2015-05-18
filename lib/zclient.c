@@ -872,6 +872,37 @@ memconstant(const void *s, int c, size_t n)
   return 1;
 }
 
+#if defined(HAVE_BFD)
+struct interface*
+zebra_interface_bfd_read (struct stream *s, struct prefix *p)
+{
+  unsigned int ifindex;
+  struct interface *ifp;
+  int plen;
+
+  /* Get interface index. */
+  ifindex = stream_getl (s);
+
+  /* Lookup index. */
+  ifp = if_lookup_by_index (ifindex);
+  if (ifp == NULL)
+    {
+      zlog_warn ("zebra_interface_bfd_read: "
+                 "Can't find interface by ifindex: %d ", ifindex);
+      return NULL;
+    }
+
+  /* Fetch interface address. */
+  p->family = stream_getc (s);
+
+  plen = prefix_blen (p);
+  stream_get (&p->u.prefix, s, plen);
+  p->prefixlen = stream_getc (s);
+
+  return ifp;
+}
+#endif
+
 struct connected *
 zebra_interface_address_read (int type, struct stream *s)
 {
@@ -1137,6 +1168,12 @@ zclient_read (struct thread *thread)
       if (zclient->interface_address_delete)
 	(*zclient->interface_address_delete) (command, zclient, length);
       break;
+#if defined(HAVE_BFD)
+    case ZEBRA_INTERFACE_BFD_DEST_DOWN:
+      if (zclient->interface_bfd_dest_down)
+	(*zclient->interface_bfd_dest_down) (command, zclient, length);
+      break;
+#endif
     case ZEBRA_INTERFACE_NBR_ADDRESS_ADD:
       if (zclient->interface_nbr_address_add)
 	(*zclient->interface_nbr_address_add) (command, zclient, length);

@@ -3123,6 +3123,9 @@ static const struct peer_flag_action peer_flag_action_list[] =
     { PEER_FLAG_STRICT_CAP_MATCH,         0, peer_change_none },
     { PEER_FLAG_DYNAMIC_CAPABILITY,       0, peer_change_reset },
     { PEER_FLAG_DISABLE_CONNECTED_CHECK,  0, peer_change_reset },
+#if defined(HAVE_BFD)
+    { PEER_FLAG_BFD,                      0, peer_change_none },
+#endif
     { 0, 0, 0 }
   };
 
@@ -5893,6 +5896,14 @@ bgp_config_write_peer (struct vty *vty, struct bgp *bgp,
         if (! peer_group_active (peer) ||
 	    ! CHECK_FLAG (g_peer->flags, PEER_FLAG_SHUTDOWN))
 	  vty_out (vty, " neighbor %s shutdown%s", addr, VTY_NEWLINE);
+
+#if defined(HAVE_BFD)
+      /* bfd. */
+      if (CHECK_FLAG (peer->flags, PEER_FLAG_BFD))
+        if (! peer_group_active (peer) ||
+            ! CHECK_FLAG (g_peer->flags, PEER_FLAG_BFD))
+	  vty_out (vty, " neighbor %s bfd%s", addr, VTY_NEWLINE);
+#endif
 
       /* Password. */
       if (peer->password)

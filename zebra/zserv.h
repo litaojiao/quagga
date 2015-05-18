@@ -92,6 +92,9 @@ struct zserv
   u_int32_t ifdown_cnt;
   u_int32_t ifadd_cnt;
   u_int32_t ifdel_cnt;
+#if defined(HAVE_BFD)
+  u_int32_t if_bfd_cnt;
+#endif
 
   time_t connect_time;
   time_t last_read_time;
@@ -146,7 +149,10 @@ extern int zsend_interface_update (int, struct zserv *, struct interface *);
 extern int zsend_route_multipath (int, struct zserv *, struct prefix *, 
                                   struct rib *);
 extern int zsend_router_id_update(struct zserv *, struct prefix *);
-
+#if defined(HAVE_BFD)
+extern int zsend_interface_bfd_update(int, struct zserv *, struct interface *,
+                                      struct prefix *);
+#endif
 extern pid_t pid;
 
 extern void zserv_create_header(struct stream *s, uint16_t cmd);

@@ -293,6 +293,8 @@ AC_ARG_ENABLE(fpm,
 [  --enable-fpm            enable Forwarding Plane Manager support])
 AC_ARG_ENABLE(ptm,
 [  --enable-ptm            enable PTM support])
+AC_ARG_ENABLE(bfd,
+[  --enable-bfd            enable BFD support])
 
 if test x"${enable_gcc_ultra_verbose}" = x"yes" ; then
   CFLAGS="${CFLAGS} -W -Wcast-qual -Wstrict-prototypes"
@@ -317,6 +319,10 @@ fi
 
 if test "${enable_ptm}" = "yes"; then
    AC_DEFINE(HAVE_PTM,,PTM support)
+fi
+
+if test "${enable_bfd}" = "yes"; then
+   AC_DEFINE(HAVE_BFD,,BFD Support)
 fi
 
 if test "${enable_fpm}" = "yes"; then

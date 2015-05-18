@@ -6217,6 +6217,41 @@ ALIAS (no_ip_ospf_priority,
        "OSPF interface commands\n"
        "Router priority\n")
 
+#if defined(HAVE_BFD)
+DEFUN (ip_ospf_bfd,
+       ip_ospf_bfd_cmd,
+       "ip ospf bfd",
+       "IP Information\n"
+       "OSPF interface commands\n"
+       "Respond to BFD session event\n")
+{
+  struct interface *ifp = vty->index;
+  struct ospf_if_params *params;
+
+  params = IF_DEF_PARAMS (ifp);
+  SET_IF_PARAM (params, bfd);
+
+  return CMD_SUCCESS;
+}
+
+DEFUN (no_ip_ospf_bfd,
+       no_ip_ospf_bfd_cmd,
+       "no ip ospf bfd",
+       NO_STR
+       "IP Information\n"
+       "OSPF interface commands\n"
+       "Respond to BFD session event\n")
+{
+  struct interface *ifp = vty->index;
+  struct ospf_if_params *params;
+
+  params = IF_DEF_PARAMS (ifp);
+  UNSET_IF_PARAM (params, bfd);
+
+  return CMD_SUCCESS;
+}
+#endif
+
 DEFUN (ip_ospf_retransmit_interval,
        ip_ospf_retransmit_interval_addr_cmd,
        "ip ospf retransmit-interval <3-65535> A.B.C.D",
@@ -7894,6 +7929,12 @@ config_write_interface (struct vty *vty)
 	    vty_out (vty, "%s", VTY_NEWLINE);
 	  }
 
+#if defined(HAVE_BFD)
+	/* bfd  print. */
+	if (OSPF_IF_PARAM_CONFIGURED (params, bfd))
+	  vty_out (vty, " ip ospf bfd%s", VTY_NEWLINE);
+#endif
+
     /* MTU ignore print. */
     if (OSPF_IF_PARAM_CONFIGURED (params, mtu_ignore) &&
        params->mtu_ignore != OSPF_MTU_IGNORE_DEFAULT)
@@ -8634,6 +8675,10 @@ ospf_vty_if_init (void)
   install_element (INTERFACE_NODE, &no_ospf_retransmit_interval_cmd);
   install_element (INTERFACE_NODE, &ospf_transmit_delay_cmd);
   install_element (INTERFACE_NODE, &no_ospf_transmit_delay_cmd);
+#if defined(HAVE_BFD)
+  install_element (INTERFACE_NODE, &ip_ospf_bfd_cmd);
+  install_element (INTERFACE_NODE, &no_ip_ospf_bfd_cmd);
+#endif
 }
 
 static void
