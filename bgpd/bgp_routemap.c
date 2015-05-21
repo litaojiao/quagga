@@ -1118,8 +1118,6 @@ route_set_ip_nexthop (void *rule, struct prefix *prefix,
 	       */
 	      SET_FLAG(bgp_info->attr->rmap_change_flags,
 		       BATTR_RMAP_NEXTHOP_PEER_ADDRESS);
-	      SET_FLAG(bgp_info->attr->rmap_change_flags,
-		       BATTR_RMAP_NEXTHOP_CHANGED);
               bgp_info->attr->nexthop.s_addr = 0;
 	    }
 	}
@@ -1129,7 +1127,7 @@ route_set_ip_nexthop (void *rule, struct prefix *prefix,
 	  bgp_info->attr->flag |= ATTR_FLAG_BIT (BGP_ATTR_NEXT_HOP);
 	  bgp_info->attr->nexthop = *rins->address;
 	  SET_FLAG(bgp_info->attr->rmap_change_flags,
-		   BATTR_RMAP_NEXTHOP_CHANGED);
+		   BATTR_RMAP_IPV4_NHOP_CHANGED);
 	}
     }
 
@@ -2197,7 +2195,7 @@ route_set_ipv6_nexthop_global (void *rule, struct prefix *prefix,
 	bgp_info->attr->extra->mp_nexthop_len = BGP_ATTR_NHLEN_IPV6_GLOBAL;
 
       SET_FLAG(bgp_info->attr->rmap_change_flags,
-	       BATTR_RMAP_NEXTHOP_CHANGED);
+	       BATTR_RMAP_IPV6_GLOBAL_NHOP_CHANGED);
     }
 
   return RMAP_OKAY;
@@ -2264,7 +2262,7 @@ route_set_ipv6_nexthop_local (void *rule, struct prefix *prefix,
 	bgp_info->attr->extra->mp_nexthop_len = BGP_ATTR_NHLEN_IPV6_GLOBAL_AND_LL;
 
       SET_FLAG(bgp_info->attr->rmap_change_flags,
-	       BATTR_RMAP_NEXTHOP_CHANGED);
+	       BATTR_RMAP_IPV6_LL_NHOP_CHANGED);
     }
 
   return RMAP_OKAY;
@@ -2341,8 +2339,6 @@ route_set_ipv6_nexthop_peer (void *rule, struct prefix *prefix,
 	{
 	  SET_FLAG(bgp_info->attr->rmap_change_flags,
 		   BATTR_RMAP_NEXTHOP_PEER_ADDRESS);
-	  SET_FLAG(bgp_info->attr->rmap_change_flags,
-		   BATTR_RMAP_NEXTHOP_CHANGED);
           /* clear next hop value. */
           memset (&((bgp_attr_extra_get (bgp_info->attr))->mp_nexthop_global),
                   0, sizeof (struct in6_addr));
