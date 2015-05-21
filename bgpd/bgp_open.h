@@ -77,6 +77,7 @@ struct capability_gr
 #define CAPABILITY_CODE_DYNAMIC_OLD    66 /* Dynamic Capability, deprecated since 2003 */
 #define CAPABILITY_CODE_DYNAMIC        67 /* Dynamic Capability */
 #define CAPABILITY_CODE_ADDPATH        69 /* Addpath Capability */
+#define CAPABILITY_CODE_ENHE            5 /* Extended Next Hop Encoding */
 #define CAPABILITY_CODE_REFRESH_OLD   128 /* Route Refresh Capability(cisco) */
 #define CAPABILITY_CODE_ORF_OLD       130 /* Cooperative Route Filtering Capability(cisco) */
 
@@ -87,6 +88,7 @@ struct capability_gr
 #define CAPABILITY_CODE_RESTART_LEN     2 /* Receiving only case */
 #define CAPABILITY_CODE_AS4_LEN         4
 #define CAPABILITY_CODE_ADDPATH_LEN     4
+#define CAPABILITY_CODE_ENHE_LEN        6 /* NRLI AFI = 2, SAFI = 2, Nexthop AFI = 2 */
 
 /* Cooperative Route Filtering Capability.  */
 

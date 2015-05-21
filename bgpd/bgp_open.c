@@ -451,6 +451,62 @@ bgp_capability_addpath (struct peer *peer, struct capability_header *hdr)
   return 0;
 }
 
+static int
+bgp_capability_enhe (struct peer *peer, struct capability_header *hdr)
+{
+  struct stream *s = BGP_INPUT (peer);
+  size_t end = stream_get_getp (s) + hdr->length;
+
+  while (stream_get_getp (s) + 6 <= end)
+    {
+      afi_t afi = stream_getw (s);
+      safi_t safi = stream_getw (s);
+      afi_t nh_afi = stream_getw (s);
+
+      if (bgp_debug_neighbor_events(peer))
+        zlog_debug ("%s   Received with value triple (afi/safi/next-hop afi): %u/%u/%u",
+                    peer->host, afi, safi, nh_afi);
+
+      if (!bgp_afi_safi_valid_indices (afi, &safi))
+        {
+          if (bgp_debug_neighbor_events(peer))
+            zlog_debug ("%s Addr-family %d/%d(afi/safi) not supported."
+                        " Ignore the Extended NH capability for this AFI/SAFI",
+                        peer->host, afi, safi);
+	  continue;
+        }
+      else if (!peer->afc[afi][safi])
+        {
+          if (bgp_debug_neighbor_events(peer))
+            zlog_debug ("%s Addr-family %d/%d(afi/safi) not enabled."
+                        " Ignore the Extended NH capability for this AFI/SAFI",
+                        peer->host, afi, safi);
+	  continue;
+        }
+
+      if (afi != AFI_IP || nh_afi != AFI_IP6)
+        {
+          zlog_warn ("%s Extended Next-hop capability, wrong afi/next-hop afi: %u/%u",
+                     peer->host, afi, nh_afi);
+          return -1;
+        }
+
+      /* Until SAFIs other than SAFI_UNICAST are supported */
+      if (safi != SAFI_UNICAST)
+        zlog_warn ("%s Extended Next-hop capability came with unsupported SAFI: %u",
+                   peer->host, safi);
+
+      SET_FLAG (peer->af_cap[afi][safi], PEER_CAP_ENHE_AF_RCV);
+
+      if (CHECK_FLAG (peer->af_cap[afi][safi], PEER_CAP_ENHE_AF_ADV))
+        SET_FLAG (peer->af_cap[afi][safi], PEER_CAP_ENHE_AF_NEGO);
+    }
+
+  SET_FLAG (peer->cap, PEER_CAP_ENHE_RCV);
+
+  return 0;
+}
+
 static const struct message capcode_str[] =
 {
   { CAPABILITY_CODE_MP,			"MultiProtocol Extensions"	},
@@ -460,6 +516,7 @@ static const struct message capcode_str[] =
   { CAPABILITY_CODE_AS4,		"4-octet AS number"		},
   { CAPABILITY_CODE_ADDPATH,            "AddPath"                       },
   { CAPABILITY_CODE_DYNAMIC,		"Dynamic"			},
+  { CAPABILITY_CODE_ENHE,               "Extended Next Hop Encoding"    },
   { CAPABILITY_CODE_DYNAMIC_OLD,	"Dynamic (Old)"			},
   { CAPABILITY_CODE_REFRESH_OLD,	"Route Refresh (Old)"		},
   { CAPABILITY_CODE_ORF_OLD,		"ORF (Old)"			},
@@ -477,6 +534,7 @@ static const size_t cap_minsizes[] =
   [CAPABILITY_CODE_ADDPATH]     = CAPABILITY_CODE_ADDPATH_LEN,
   [CAPABILITY_CODE_DYNAMIC]	= CAPABILITY_CODE_DYNAMIC_LEN,
   [CAPABILITY_CODE_DYNAMIC_OLD]	= CAPABILITY_CODE_DYNAMIC_LEN,
+  [CAPABILITY_CODE_ENHE]        = CAPABILITY_CODE_ENHE_LEN,
   [CAPABILITY_CODE_REFRESH_OLD]	= CAPABILITY_CODE_REFRESH_LEN,
   [CAPABILITY_CODE_ORF_OLD]	= sizeof (struct capability_orf_entry),
 };
@@ -543,6 +601,7 @@ bgp_capability_parse (struct peer *peer, size_t length, int *mp_capability,
           case CAPABILITY_CODE_ADDPATH:
           case CAPABILITY_CODE_DYNAMIC:
           case CAPABILITY_CODE_DYNAMIC_OLD:
+          case CAPABILITY_CODE_ENHE:
               /* Check length. */
               if (caphdr.length < cap_minsizes[caphdr.code])
                 {
@@ -615,6 +674,10 @@ bgp_capability_parse (struct peer *peer, size_t length, int *mp_capability,
               break;            
           case CAPABILITY_CODE_ADDPATH:
             if (bgp_capability_addpath (peer, &caphdr))
+              return -1;
+            break;
+          case CAPABILITY_CODE_ENHE:
+            if (bgp_capability_enhe (peer, &caphdr))
               return -1;
             break;
           default:
@@ -1000,6 +1063,26 @@ bgp_open_capability (struct stream *s, struct peer *peer)
       stream_putc (s, SAFI_MPLS_LABELED_VPN);
     }
 #ifdef HAVE_IPV6
+  /* Currently supporting RFC-5549 for Link-Local peering only */
+  if (CHECK_FLAG (peer->flags, PEER_FLAG_CAPABILITY_ENHE) &&
+      peer->su.sa.sa_family == AF_INET6 &&
+      IN6_IS_ADDR_LINKLOCAL(&peer->su.sin6.sin6_addr))
+    {
+      /* RFC 5549 Extended Next Hop Encoding */
+      SET_FLAG (peer->cap, PEER_CAP_ENHE_ADV);
+      stream_putc (s, BGP_OPEN_OPT_CAP);
+      stream_putc (s, CAPABILITY_CODE_ENHE_LEN + 2);
+      stream_putc (s, CAPABILITY_CODE_ENHE);
+      stream_putc (s, CAPABILITY_CODE_ENHE_LEN);
+      /* Currently supporting for SAFI_UNICAST only */
+      SET_FLAG (peer->af_cap[AFI_IP][SAFI_UNICAST], PEER_CAP_ENHE_AF_ADV);
+      stream_putw (s, AFI_IP);
+      stream_putw (s, SAFI_UNICAST);
+      stream_putw (s, AFI_IP6);
+
+      if (CHECK_FLAG (peer->af_cap[AFI_IP][SAFI_UNICAST], PEER_CAP_ENHE_AF_RCV))
+        SET_FLAG (peer->af_cap[AFI_IP][SAFI_UNICAST], PEER_CAP_ENHE_AF_NEGO);
+    }
   /* IPv6 unicast. */
   if (peer->afc[AFI_IP6][SAFI_UNICAST])
     {
