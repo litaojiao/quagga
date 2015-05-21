@@ -2366,6 +2366,9 @@ vty_read_config (char *config_file,
     }
   else
     {
+
+      host_config_set (config_default_dir);
+
 #ifdef VTYSH
       int ret;
       struct stat conf_stat;
@@ -2388,10 +2391,9 @@ vty_read_config (char *config_file,
         {
           ret = stat (integrate_default, &conf_stat);
           if (ret >= 0)
-            return;
+	    return;
         }
 #endif /* VTYSH */
-
       confp = fopen (config_default_dir, "r");
       if (confp == NULL)
         {

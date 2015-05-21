@@ -394,13 +394,13 @@ vtysh_read_config (char *config_default_dir)
 {
   FILE *confp = NULL;
 
+  host_config_set (config_default_dir);
   confp = fopen (config_default_dir, "r");
   if (confp == NULL)
     return (1);
 
   vtysh_read_file (confp);
   fclose (confp);
-  host_config_set (config_default_dir);
 
   return (0);
 }
@@ -422,6 +422,8 @@ vtysh_config_write ()
     }
   if (vtysh_writeconfig_integrated)
     vtysh_config_parse_line ("service integrated-vtysh-config");
+
+  user_config_write ();
 }
 
 void
