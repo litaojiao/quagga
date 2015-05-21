@@ -1356,9 +1356,10 @@ netlink_talk (struct nlmsghdr *n, struct nlsock *nl)
   n->nlmsg_flags |= NLM_F_ACK;
 
   if (IS_ZEBRA_DEBUG_KERNEL)
-    zlog_debug ("netlink_talk: %s type %s(%u), seq=%u", nl->name,
+    zlog_debug ("netlink_talk: %s type %s(%u), seq=%u flags 0x%x",
+               nl->name,
                lookup (nlmsg_str, n->nlmsg_type), n->nlmsg_type,
-               n->nlmsg_seq);
+               n->nlmsg_seq, n->nlmsg_flags);
 
   /* Send message to netlink interface. */
   if (zserv_privs.change (ZPRIVS_RAISE))
@@ -1755,9 +1756,10 @@ netlink_neigh_update (int cmd, int ifindex, __u32 addr, char *lla, int llalen)
 }
 
 /* Routing table change via netlink interface. */
+/* Update flag indicates whether this is a "replace" or not. */
 static int
 netlink_route_multipath (int cmd, struct prefix *p, struct rib *rib,
-                         int family)
+                         int family, int update)
 {
   int bytelen;
   struct sockaddr_nl snl;
@@ -1782,6 +1784,8 @@ netlink_route_multipath (int cmd, struct prefix *p, struct rib *rib,
 
   req.n.nlmsg_len = NLMSG_LENGTH (sizeof (struct rtmsg));
   req.n.nlmsg_flags = NLM_F_CREATE | NLM_F_REQUEST;
+  if ((cmd == RTM_NEWROUTE) && update)
+    req.n.nlmsg_flags |= NLM_F_REPLACE;
   req.n.nlmsg_type = cmd;
   req.r.rtm_family = family;
   req.r.rtm_table = rib->table;
@@ -1984,13 +1988,19 @@ skip:
 int
 kernel_add_ipv4 (struct prefix *p, struct rib *rib)
 {
-  return netlink_route_multipath (RTM_NEWROUTE, p, rib, AF_INET);
+  return netlink_route_multipath (RTM_NEWROUTE, p, rib, AF_INET, 0);
+}
+
+int
+kernel_update_ipv4 (struct prefix *p, struct rib *rib)
+{
+  return netlink_route_multipath (RTM_NEWROUTE, p, rib, AF_INET, 1);
 }
 
 int
 kernel_delete_ipv4 (struct prefix *p, struct rib *rib)
 {
-  return netlink_route_multipath (RTM_DELROUTE, p, rib, AF_INET);
+  return netlink_route_multipath (RTM_DELROUTE, p, rib, AF_INET, 0);
 }
 
 #ifdef HAVE_IPV6
@@ -1998,7 +2008,7 @@ int
 kernel_add_ipv6 (struct prefix *p, struct rib *rib)
 {
     {
-      return netlink_route_multipath (RTM_NEWROUTE, p, rib, AF_INET6);
+      return netlink_route_multipath (RTM_NEWROUTE, p, rib, AF_INET6, 0);
     }
 }
 
@@ -2006,7 +2016,7 @@ int
 kernel_delete_ipv6 (struct prefix *p, struct rib *rib)
 {
     {
-      return netlink_route_multipath (RTM_DELROUTE, p, rib, AF_INET6);
+      return netlink_route_multipath (RTM_DELROUTE, p, rib, AF_INET6, 0);
     }
 }
 
