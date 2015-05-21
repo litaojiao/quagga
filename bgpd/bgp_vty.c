@@ -4969,8 +4969,7 @@ DEFUN (bgp_set_route_map_delay_timer,
        SET_STR
        "BGP route-map delay timer\n"
        "Time in secs to wait before processing route-map changes\n"
-       "0 disables the timer and no route updates happen when\n"
-       "route-maps change")
+       "0 disables the timer, no route updates happen when route-maps change\n")
 {
   u_int32_t rmap_delay_timer;
   struct bgp *bgp;
@@ -5000,7 +4999,7 @@ DEFUN (no_bgp_set_route_map_delay_timer,
        "no bgp route-map delay-timer",
        NO_STR
        "Default BGP route-map delay timer\n"
-       "Reset to default time to wait for processing route-map changes")
+       "Reset to default time to wait for processing route-map changes\n")
 {
   u_int32_t rmap_delay_timer;
   struct bgp *bgp;
@@ -5010,6 +5009,14 @@ DEFUN (no_bgp_set_route_map_delay_timer,
 
   return CMD_SUCCESS;
 }
+
+ALIAS (no_bgp_set_route_map_delay_timer,
+       no_bgp_set_route_map_delay_timer_val_cmd,
+       "no bgp route-map delay-timer <0-600>",
+       NO_STR
+       "Default BGP route-map delay timer\n"
+       "Reset to default time to wait for processing route-map changes\n"
+       "0 disables the timer, no route updates happen when route-maps change\n")
 
 /* neighbor interface */
 static int
@@ -11830,6 +11837,7 @@ bgp_vty_init (void)
   /* route-map delay-timer commands */
   install_element (BGP_NODE, &bgp_set_route_map_delay_timer_cmd);
   install_element (BGP_NODE, &no_bgp_set_route_map_delay_timer_cmd);
+  install_element (BGP_NODE, &no_bgp_set_route_map_delay_timer_val_cmd);
 
   /* "bgp client-to-client reflection" commands */
   install_element (BGP_NODE, &no_bgp_client_to_client_reflection_cmd);
