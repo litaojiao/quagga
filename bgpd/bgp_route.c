@@ -7631,9 +7631,9 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
 
           if (json_paths)
             {
-              json_object_object_add(json_path, "peer-ip", json_string);
-              json_string = json_object_new_string(inet_ntoa(bgp->router_id));
               json_object_object_add(json_path, "peer-id", json_string);
+              json_string = json_object_new_string(inet_ntoa(bgp->router_id));
+              json_object_object_add(json_path, "peer-router-id", json_string);
             }
           else
             {
@@ -7671,7 +7671,7 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
           if (json_paths)
             {
               json_string = json_object_new_string(sockunion2str (&binfo->peer->su, buf, SU_ADDRSTRLEN));
-              json_object_object_add(json_path, "peer-ip", json_string);
+              json_object_object_add(json_path, "peer-id", json_string);
 	      if (binfo->peer->hostname)
 		{
 		  json_string = json_object_new_string(binfo->peer->hostname);
@@ -7721,7 +7721,7 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
           if (json_paths)
             {
               json_string = json_object_new_string(inet_ntop (AF_INET, &binfo->peer->remote_id, buf1, BUFSIZ));
-              json_object_object_add(json_path, "peer-id", json_string);
+              json_object_object_add(json_path, "peer-router-id", json_string);
             }
 	}
 
