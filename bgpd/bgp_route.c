@@ -7142,6 +7142,8 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
               json_object_object_add(json_path, "peer-id", json_string);
               json_string = json_object_new_string(inet_ntoa(bgp->router_id));
               json_object_object_add(json_path, "peer-router-id", json_string);
+              json_object_object_add(json_path, "nexthop-global-accessible",
+                                     json_boolean_true);
             }
           else
             {
@@ -7158,28 +7160,17 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
 	        vty_out (vty, " (inaccessible)");
             }
 #ifdef HAVE_IPV6
-          /* if there are two nexthops, display global nexthop as ignored,
-           * but only if it differs from the link-local nexthop.
+          /* If there are two nexthops we will always use the link-local
+           * and ignore the global.
            */
 	  else if (attr->extra &&
                    attr->extra->mp_nexthop_len == BGP_ATTR_NHLEN_IPV6_GLOBAL_AND_LL)
             {
               if (json_paths)
-                json_object_object_add(json_path, "nexthop-global-accessible",
-                                       json_boolean_true);
-              if (IPV6_ADDR_CMP (&attr->extra->mp_nexthop_global,
-                                 &attr->extra->mp_nexthop_local) != 0)
                 {
-                  if (json_paths)
-                    json_object_object_add(json_path, "nexthop-global-used",
-                                           json_boolean_false);
-                  else
-                    vty_out (vty, " (ignored)");
+                  json_object_object_add(json_path, "nexthop-global-accessible", json_boolean_true);
+                  json_object_object_add(json_path, "nexthop-global-used", json_boolean_false);
                 }
-              else
-                if (json_paths)
-                  json_object_object_add(json_path, "nexthop-global-used",
-                                         json_boolean_true);
             }
 #endif
 	  else if (binfo->extra && binfo->extra->igpmetric)
@@ -7187,10 +7178,8 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
               if (json_paths)
                 {
                   json_int = json_object_new_int(binfo->extra->igpmetric);
-                  json_object_object_add(json_path, "nexthop-global-igp-cost", json_int);
                   json_object_object_add(json_path, "nexthop-global-accessible", json_boolean_true);
-                  json_object_object_add(json_path, "nexthop-global-used",
-                                         json_boolean_true);
+                  json_object_object_add(json_path, "nexthop-global-igp-cost", json_int);
                 }
               else
                 {
@@ -7203,8 +7192,7 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
             if (json_paths)
               {
                 json_object_object_add(json_path, "nexthop-global-accessible", json_boolean_true);
-                json_object_object_add(json_path, "nexthop-global-used",
-                                       json_boolean_true);
+                json_object_object_add(json_path, "nexthop-global-used", json_boolean_true);
               }
 
           if (json_paths)
@@ -7276,10 +7264,12 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
               json_string = json_object_new_string(inet_ntop (AF_INET6, &attr->extra->mp_nexthop_local,
                                                               buf, INET6_ADDRSTRLEN));
               json_object_object_add(json_path, "nexthop-local", json_string);
+              json_object_object_add(json_path, "nexthop-local-accessible", json_boolean_true);
+              json_object_object_add(json_path, "nexthop-local-used", json_boolean_true);
             }
           else
             {
-	      vty_out (vty, "    (%s)%s",
+	      vty_out (vty, "    (%s) (used)%s",
 		       inet_ntop (AF_INET6, &attr->extra->mp_nexthop_local,
 			          buf, INET6_ADDRSTRLEN),
 		       VTY_NEWLINE);
