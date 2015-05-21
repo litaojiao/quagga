@@ -6599,9 +6599,15 @@ route_vty_out (struct vty *vty, struct prefix *p,
   json_object *json_path;
   json_object *json_int;
   json_object *json_string;
+  json_object *json_boolean_false;
+  json_object *json_boolean_true;
 
   if (json_paths)
-    json_path = json_object_new_object();
+    {
+      json_path = json_object_new_object();
+      json_boolean_false = json_object_new_boolean(0);
+      json_boolean_true = json_object_new_boolean(1);
+    }
   else
     json_path = NULL;
 
@@ -6658,19 +6664,89 @@ route_vty_out (struct vty *vty, struct prefix *p,
 
           if (json_paths)
             {
-              json_string = json_object_new_string(inet_ntop (AF_INET6, &attr->extra->mp_nexthop_global, buf, BUFSIZ));
-              json_object_object_add(json_path, "nexthop-global", json_string);
+	      if ((attr->extra->mp_nexthop_len == 32) || (binfo->peer->conf_if))
+		{
+		  /* We display both LL & GL if both have been received */
+		  json_string = json_object_new_string(inet_ntop (AF_INET6,
+								  &attr->extra->mp_nexthop_local,
+								  buf, BUFSIZ));
+		  json_object_object_add(json_path, "nexthop-local", json_string);
+		  json_object_object_add(json_path, "nexthop-used",
+					 json_boolean_true);
+		  json_object_object_add(json_path, "nexthop-accessible",
+					 json_boolean_true);
+
+		  json_string = json_object_new_string(inet_ntop (AF_INET6,
+								  &attr->extra->mp_nexthop_global,
+								  buf, BUFSIZ));
+		  json_object_object_add(json_path, "nexthop-global", json_string);
+		  if (IPV6_ADDR_CMP (&attr->extra->mp_nexthop_global,
+				     &attr->extra->mp_nexthop_local) != 0)
+		    {
+		      json_object_object_add(json_path, "nexthop-used", json_boolean_false);
+		      json_object_object_add(json_path, "nexthop-accessible",
+					     json_boolean_true);
+		    }
+		  else
+		    {
+		      json_object_object_add(json_path, "nexthop-used", json_boolean_true);
+		      json_object_object_add(json_path, "nexthop-accessible",
+					     json_boolean_true);
+		    }
+		}
+	      else
+		{
+		  json_string = json_object_new_string(inet_ntop (AF_INET6,
+								  &attr->extra->mp_nexthop_global,
+								  buf, BUFSIZ));
+		  json_object_object_add(json_path, "nexthop-global", json_string);
+		  json_object_object_add(json_path, "nexthop-used", json_boolean_true);
+		  json_object_object_add(json_path, "nexthop-accessible",
+					 json_boolean_true);
+		}
             }
           else
             {
-	      len = vty_out (vty, "%s",
-			     inet_ntop (AF_INET6, &attr->extra->mp_nexthop_global,
-			     buf, BUFSIZ));
-	      len = 16 - len;
-	      if (len < 1)
-	        vty_out (vty, "%s%*s", VTY_NEWLINE, 36, " ");
+	      if ((attr->extra->mp_nexthop_len == 32) || (binfo->peer->conf_if))
+		{
+		  if (binfo->peer->conf_if)
+		    {
+		      len = vty_out (vty, "%s",
+				     binfo->peer->conf_if);
+		      len = 7 - len; /* len of IPv6 addr + max len of def ifname */
+
+		      if (len < 1)
+			vty_out (vty, "%s%*s", VTY_NEWLINE, 45, " ");
+		      else
+			vty_out (vty, "%*s", len, " ");
+		    }
+		  else
+		    {
+		      len = vty_out (vty, "%s",
+				     inet_ntop (AF_INET6,
+						&attr->extra->mp_nexthop_local,
+						buf, BUFSIZ));
+		      len = 16 - len;
+
+		      if (len < 1)
+			vty_out (vty, "%s%*s", VTY_NEWLINE, 36, " ");
+		      else
+			vty_out (vty, "%*s", len, " ");
+		    }
+		}
 	      else
-	        vty_out (vty, "%*s", len, " ");
+		{
+		      len = vty_out (vty, "%s",
+				     inet_ntop (AF_INET6,
+						&attr->extra->mp_nexthop_global,
+						buf, BUFSIZ));
+		      len = 16 - len;
+
+		      if (len < 1)
+			vty_out (vty, "%s%*s", VTY_NEWLINE, 36, " ");
+		      else
+			vty_out (vty, "%*s", len, " ");
+		}
             }
 	}
 #endif /* HAVE_IPV6 */
