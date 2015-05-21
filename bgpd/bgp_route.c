@@ -12194,16 +12194,9 @@ show_adj_route (struct vty *vty, struct peer *peer, afi_t afi, safi_t safi,
 	      }
 	    if (adj->attr)
 	      {
-		if (!CHECK_FLAG(peer->af_flags[afi][safi],
-				PEER_FLAG_REFLECTOR_CLIENT)
-		    || bgp_flag_check(bgp, BGP_FLAG_RR_ALLOW_OUTBOUND_POLICY))
-		  {
-		    bgp_attr_dup(&attr, adj->attr);
-		    ret = bgp_output_modifier(peer, &rn->p, &attr, afi,
-					      safi, rmap_name);
-		  }
-		else
-		  ret = RMAP_PERMIT;
+                bgp_attr_dup(&attr, adj->attr);
+                ret = bgp_output_modifier(peer, &rn->p, &attr, afi,
+                                          safi, rmap_name);
 
 		if (ret != RMAP_DENY)
 		  {
@@ -12234,16 +12227,6 @@ peer_adj_routes (struct vty *vty, struct peer *peer, afi_t afi, safi_t safi,
   if (in && ! CHECK_FLAG (peer->af_flags[afi][safi], PEER_FLAG_SOFT_RECONFIG))
     {
       vty_out (vty, "%% Inbound soft reconfiguration not enabled%s",
-	       VTY_NEWLINE);
-      return CMD_WARNING;
-    }
-
-  if (!in && (CHECK_FLAG(peer->af_flags[afi][safi], PEER_FLAG_REFLECTOR_CLIENT)
-	      && !bgp_flag_check(peer->bgp, BGP_FLAG_RR_ALLOW_OUTBOUND_POLICY)))
-    {
-      vty_out (vty, "%% Cannot apply outgoing route-map on route-reflector clients%s",
-	       VTY_NEWLINE);
-      vty_out (vty, "%% Enable bgp route-reflector allow-outbound-policy flag%s",
 	       VTY_NEWLINE);
       return CMD_WARNING;
     }
