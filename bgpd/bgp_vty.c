@@ -55,6 +55,41 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 
 extern struct in_addr router_id_zebra;
 
+/* Intentional re-definition of the auto-generated macros, without table */
+#define QUAGGA_REDIST_STR_BGPD \
+  "(kernel|connected|static|rip|ripng|ospf|ospf6|isis|babel)"
+#define QUAGGA_REDIST_HELP_STR_BGPD \
+  "Kernel routes (not installed via the zebra RIB)\n" \
+  "Connected routes (directly attached subnet or host)\n" \
+  "Statically configured routes\n" \
+  "Routing Information Protocol (RIP)\n" \
+  "Routing Information Protocol next-generation (IPv6) (RIPng)\n" \
+  "Open Shortest Path First (OSPFv2)\n" \
+  "Open Shortest Path First (IPv6) (OSPFv3)\n" \
+  "Intermediate System to Intermediate System (IS-IS)\n" \
+  "Babel routing protocol (Babel)\n"
+#define QUAGGA_IP_REDIST_STR_BGPD \
+  "(kernel|connected|static|rip|ospf|isis|babel)"
+#define QUAGGA_IP_REDIST_HELP_STR_BGPD \
+  "Kernel routes (not installed via the zebra RIB)\n" \
+  "Connected routes (directly attached subnet or host)\n" \
+  "Statically configured routes\n" \
+  "Routing Information Protocol (RIP)\n" \
+  "Open Shortest Path First (OSPFv2)\n" \
+  "Intermediate System to Intermediate System (IS-IS)\n" \
+  "Babel routing protocol (Babel)\n"
+#define QUAGGA_IP6_REDIST_STR_BGPD \
+  "(kernel|connected|static|ripng|ospf6|isis|babel)"
+#define QUAGGA_IP6_REDIST_HELP_STR_BGPD \
+  "Kernel routes (not installed via the zebra RIB)\n" \
+  "Connected routes (directly attached subnet or host)\n" \
+  "Statically configured routes\n" \
+  "Routing Information Protocol next-generation (IPv6) (RIPng)\n" \
+  "Open Shortest Path First (IPv6) (OSPFv3)\n" \
+  "Intermediate System to Intermediate System (IS-IS)\n" \
+  "Babel routing protocol (Babel)\n"
+
+
 /* Utility function to get address family from current node.  */
 afi_t
 bgp_node_afi (struct vty *vty)
@@ -10980,7 +11015,8 @@ DEFUN (bgp_redistribute_ipv4_ospf,
        "redistribute (ospf|table) <1-65535>",
        "Redistribute information from another routing protocol\n"
        "Open Shortest Path First (OSPFv2)\n"
-       "Instance ID\n")
+       "Non-main Kernel Routing Table\n"
+       "Instance ID/Table ID\n")
 {
   u_short instance;
   u_short protocol;
@@ -11001,7 +11037,8 @@ DEFUN (bgp_redistribute_ipv4_ospf_rmap,
        "redistribute (ospf|table) <1-65535> route-map WORD",
        "Redistribute information from another routing protocol\n"
        "Open Shortest Path First (OSPFv2)\n"
-       "Instance ID\n"
+       "Non-main Kernel Routing Table\n"
+       "Instance ID/Table ID\n"
        "Route map reference\n"
        "Pointer to route-map entries\n")
 {
@@ -11025,7 +11062,8 @@ DEFUN (bgp_redistribute_ipv4_ospf_metric,
        "redistribute (ospf|table) <1-65535> metric <0-4294967295>",
        "Redistribute information from another routing protocol\n"
        "Open Shortest Path First (OSPFv2)\n"
-       "Instance ID\n"
+       "Non-main Kernel Routing Table\n"
+       "Instance ID/Table ID\n"
        "Metric for redistributed routes\n"
        "Default metric\n")
 {
@@ -11052,7 +11090,8 @@ DEFUN (bgp_redistribute_ipv4_ospf_rmap_metric,
        "redistribute (ospf|table) <1-65535> route-map WORD metric <0-4294967295>",
        "Redistribute information from another routing protocol\n"
        "Open Shortest Path First (OSPFv2)\n"
-       "Instance ID\n"
+       "Non-main Kernel Routing Table\n"
+       "Instance ID/Table ID\n"
        "Route map reference\n"
        "Pointer to route-map entries\n"
        "Metric for redistributed routes\n"
@@ -11082,7 +11121,8 @@ DEFUN (bgp_redistribute_ipv4_ospf_metric_rmap,
        "redistribute (ospf|table) <1-65535> metric <0-4294967295> route-map WORD",
        "Redistribute information from another routing protocol\n"
        "Open Shortest Path First (OSPFv2)\n"
-       "Instance ID\n"
+       "Non-main Kernel Routing Table\n"
+       "Instance ID/Table ID\n"
        "Metric for redistributed routes\n"
        "Default metric\n"
        "Route map reference\n"
@@ -11113,7 +11153,8 @@ DEFUN (no_bgp_redistribute_ipv4_ospf,
        NO_STR
        "Redistribute information from another routing protocol\n"
        "Open Shortest Path First (OSPFv2)\n"
-       "Instance ID\n")
+       "Non-main Kernel Routing Table\n"
+       "Instance ID/Table ID\n")
 {
   u_short instance;
   int protocol;
@@ -11133,7 +11174,8 @@ ALIAS (no_bgp_redistribute_ipv4_ospf,
        NO_STR
        "Redistribute information from another routing protocol\n"
        "Open Shortest Path First (OSPFv2)\n"
-       "Instance ID\n"
+       "Non-main Kernel Routing Table\n"
+       "Instance ID/Table ID\n"
        "Route map reference\n"
        "Pointer to route-map entries\n")
 
@@ -11143,7 +11185,8 @@ ALIAS (no_bgp_redistribute_ipv4_ospf,
        NO_STR
        "Redistribute information from another routing protocol\n"
        "Open Shortest Path First (OSPFv2)\n"
-       "Instance ID\n"
+       "Non-main Kernel Routing Table\n"
+       "Instance ID/Table ID\n"
        "Metric for redistributed routes\n"
        "Default metric\n")
 
@@ -11153,7 +11196,8 @@ ALIAS (no_bgp_redistribute_ipv4_ospf,
        NO_STR
        "Redistribute information from another routing protocol\n"
        "Open Shortest Path First (OSPFv2)\n"
-       "Instance ID\n"
+       "Non-main Kernel Routing Table\n"
+       "Instance ID/Table ID\n"
        "Route map reference\n"
        "Pointer to route-map entries\n"
        "Metric for redistributed routes\n"
@@ -11165,7 +11209,8 @@ ALIAS (no_bgp_redistribute_ipv4_ospf,
        NO_STR
        "Redistribute information from another routing protocol\n"
        "Open Shortest Path First (OSPFv2)\n"
-       "Instance ID\n"
+       "Non-main Kernel Routing Table\n"
+       "Instance ID/Table ID\n"
        "Metric for redistributed routes\n"
        "Default metric\n"
        "Route map reference\n"
