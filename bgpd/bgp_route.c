@@ -1169,11 +1169,13 @@ bgp_announce_check (struct bgp_info *ri, struct peer *peer, struct prefix *p,
   int transparent;
   int reflect;
   struct attr *riattr;
+  struct update_subgroup *subgrp;
 
   from = ri->peer;
   filter = &peer->filter[afi][safi];
   bgp = peer->bgp;
   riattr = bgp_info_mpath_count (ri) ? bgp_info_mpath_attr (ri) : ri->attr;
+  subgrp = peer_subgroup(peer, afi, safi);
   
   if (DISABLE_BGP_ANNOUNCE)
     return 0;
@@ -1192,7 +1194,7 @@ bgp_announce_check (struct bgp_info *ri, struct peer *peer, struct prefix *p,
       return 0;
 
   /* Default route check.  */
-  if (CHECK_FLAG (peer->af_sflags[afi][safi], PEER_STATUS_DEFAULT_ORIGINATE))
+  if (subgrp && CHECK_FLAG (subgrp->sflags, SUBGRP_STATUS_DEFAULT_ORIGINATE))
     {
       if (p->family == AF_INET && p->u.prefix4.s_addr == INADDR_ANY)
 	return 0;
@@ -1811,10 +1813,12 @@ bgp_announce_check_rsclient (struct bgp_info *ri, struct peer *rsclient,
   struct bgp_info info;
   struct peer *from;
   struct attr *riattr;
+  struct update_subgroup *subgrp;
 
   from = ri->peer;
   filter = &rsclient->filter[afi][safi];
   riattr = bgp_info_mpath_count (ri) ? bgp_info_mpath_attr (ri) : ri->attr;
+  subgrp = peer_subgroup(rsclient, afi, safi);
 
   if (DISABLE_BGP_ANNOUNCE)
     return 0;
@@ -1829,8 +1833,7 @@ bgp_announce_check_rsclient (struct bgp_info *ri, struct peer *rsclient,
       return 0;
 
   /* Default route check.  */
-  if (CHECK_FLAG (rsclient->af_sflags[afi][safi],
-          PEER_STATUS_DEFAULT_ORIGINATE))
+  if (subgrp && CHECK_FLAG (subgrp->sflags, SUBGRP_STATUS_DEFAULT_ORIGINATE))
     {
       if (p->family == AF_INET && p->u.prefix4.s_addr == INADDR_ANY)
         return 0;
@@ -2037,8 +2040,7 @@ subgroup_announce_check_rsclient (struct bgp_info *ri,
       return 0;
 
   /* Default route check.  */
-  if (CHECK_FLAG (rsclient->af_sflags[afi][safi],
-          PEER_STATUS_DEFAULT_ORIGINATE))
+  if (CHECK_FLAG (subgrp->sflags, SUBGRP_STATUS_DEFAULT_ORIGINATE))
     {
       if (p->family == AF_INET && p->u.prefix4.s_addr == INADDR_ANY)
         return 0;
@@ -12228,6 +12230,7 @@ show_adj_route (struct vty *vty, struct peer *peer, afi_t afi, safi_t safi,
   struct attr attr;
   struct attr_extra extra;
   int ret;
+  struct update_subgroup *subgrp;
 
   bgp = peer->bgp;
 
@@ -12237,9 +12240,9 @@ show_adj_route (struct vty *vty, struct peer *peer, afi_t afi, safi_t safi,
   table = bgp->rib[afi][safi];
 
   output_count = filtered_count = 0;
+  subgrp = peer_subgroup(peer, afi, safi);
 
-  if (! in && CHECK_FLAG (peer->af_sflags[afi][safi],
-			  PEER_STATUS_DEFAULT_ORIGINATE))
+  if (!in && subgrp && CHECK_FLAG (subgrp->sflags, SUBGRP_STATUS_DEFAULT_ORIGINATE))
     {
       vty_out (vty, "BGP table version is %llu, local router ID is %s%s", table->version, inet_ntoa (bgp->router_id), VTY_NEWLINE);
       vty_out (vty, BGP_SHOW_SCODE_HEADER, VTY_NEWLINE, VTY_NEWLINE);
