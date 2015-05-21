@@ -7157,6 +7157,31 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
               else
 	        vty_out (vty, " (inaccessible)");
             }
+#ifdef HAVE_IPV6
+          /* if there are two nexthops, display global nexthop as ignored,
+           * but only if it differs from the link-local nexthop.
+           */
+	  else if (attr->extra &&
+                   attr->extra->mp_nexthop_len == BGP_ATTR_NHLEN_IPV6_GLOBAL_AND_LL)
+            {
+              if (json_paths)
+                json_object_object_add(json_path, "nexthop-accessible",
+                                       json_boolean_true);
+              if (IPV6_ADDR_CMP (&attr->extra->mp_nexthop_global,
+                                 &attr->extra->mp_nexthop_local) != 0)
+                {
+                  if (json_paths)
+                    json_object_object_add(json_path, "nexthop-used",
+                                           json_boolean_false);
+                  else
+                    vty_out (vty, " (ignored)");
+                }
+              else
+                if (json_paths)
+                  json_object_object_add(json_path, "nexthop-used",
+                                         json_boolean_true);
+            }
+#endif
 	  else if (binfo->extra && binfo->extra->igpmetric)
             {
               if (json_paths)
@@ -7164,6 +7189,8 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
                   json_int = json_object_new_int(binfo->extra->igpmetric);
                   json_object_object_add(json_path, "nexthop-igp-cost", json_int);
                   json_object_object_add(json_path, "nexthop-accessible", json_boolean_true);
+                  json_object_object_add(json_path, "nexthop-used",
+                                         json_boolean_true);
                 }
               else
                 {
@@ -7174,7 +7201,11 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
           /* IGP cost to nexthop is 0 */
           else
             if (json_paths)
-              json_object_object_add(json_path, "nexthop-accessible", json_boolean_true);
+              {
+                json_object_object_add(json_path, "nexthop-accessible", json_boolean_true);
+                json_object_object_add(json_path, "nexthop-used",
+                                       json_boolean_true);
+              }
 
           if (json_paths)
             {
