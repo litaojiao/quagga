@@ -1669,7 +1669,7 @@ rib_process (struct route_node *rn)
                 }
 
 	      /* assuming that the receiver knows how to dedup */
-	      redistribute_add (&rn->p, select);
+	      redistribute_update (&rn->p, select, NULL);
 	    }
 	  else
 	    {
@@ -1763,7 +1763,10 @@ rib_process (struct route_node *rn)
 
 	  SET_FLAG (select->flags, ZEBRA_FLAG_SELECTED);
 	  /* Unconditionally announce, this part is exercised by new routes */
-	  redistribute_add (&rn->p, select);
+	  /* If we cannot add, for example route added is learnt by the */
+	  /* protocol we're trying to redistribute to, delete the redist */
+	  /* This is notified by setting the is_update to 1 */
+	  redistribute_update (&rn->p, select, fib);
 	}
       else
 	{
@@ -2894,7 +2897,7 @@ static_uninstall_ipv4 (struct prefix *p, struct static_ipv4 *si)
           if (rib->nexthop_active_num > 1)
             {
               rib_install_kernel (rn, rib, 1);
-              redistribute_add (&rn->p, rib);
+              redistribute_update (&rn->p, rib, NULL);
             }
           else
 	    {
@@ -3653,7 +3656,7 @@ static_uninstall_ipv6 (struct prefix *p, struct static_ipv6 *si)
           if (rib->nexthop_active_num > 1)
             {
               rib_install_kernel (rn, rib, 1);
-              redistribute_add (&rn->p, rib);
+              redistribute_update (&rn->p, rib, NULL);
             }
           else
 	    {
