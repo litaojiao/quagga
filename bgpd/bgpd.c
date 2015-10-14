@@ -1120,8 +1120,6 @@ peer_xfer_config (struct peer *peer_dst, struct peer *peer_src)
   if (peer_src->password && !peer_dst->password)
     peer_dst->password =  XSTRDUP (MTYPE_PEER_PASSWORD, peer_src->password);
 
-  bgp_md5_set (peer_dst);
-
   for (afi = AFI_IP; afi < AFI_MAX; afi++)
     for (safi = SAFI_UNICAST; safi < SAFI_MAX; safi++)
       {
@@ -1690,10 +1688,12 @@ peer_delete (struct peer *peer)
   struct bgp *bgp;
   struct bgp_filter *filter;
   struct listnode *pn;
+  int accept_peer;
 
   assert (peer->status != Deleted);
 
   bgp = peer->bgp;
+  accept_peer = CHECK_FLAG (peer->sflags, PEER_STATUS_ACCEPT_PEER);
 
   if (CHECK_FLAG (peer->sflags, PEER_STATUS_NSF_WAIT))
     peer_nsf_stop (peer);
@@ -1736,7 +1736,8 @@ peer_delete (struct peer *peer)
       XFREE (MTYPE_PEER_PASSWORD, peer->password);
       peer->password = NULL;
 
-      if (! CHECK_FLAG (peer->sflags, PEER_STATUS_GROUP))
+      if (!accept_peer &&
+          ! CHECK_FLAG (peer->sflags, PEER_STATUS_GROUP))
 	bgp_md5_set (peer);
     }
   
