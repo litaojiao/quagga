@@ -976,7 +976,7 @@ ospf6_interface_show (struct vty *vty, struct interface *ifp)
   for (lsa = ospf6_lsdb_head (oi->lsack_list); lsa;
        lsa = ospf6_lsdb_next (lsa))
     vty_out (vty, "      %s%s", lsa->name, VNL);
-
+  bfd_show_param(vty, oi->bfd_info, 1, 0);
   return 0;
 }
 

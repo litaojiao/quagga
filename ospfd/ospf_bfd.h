@@ -33,4 +33,9 @@ ospf_bfd_write_config(struct vty *vty, struct ospf_if_params *params);
 extern void
 ospf_bfd_trigger_event(struct ospf_neighbor *nbr, int old_state, int state);
 
+extern void
+ospf_bfd_interface_show(struct vty *vty, struct interface *ifp);
+
+extern void
+ospf_bfd_info_nbr_create (struct ospf_interface *oi, struct ospf_neighbor *nbr);
 #endif /* _ZEBRA_OSPF_BFD_H */

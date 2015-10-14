@@ -27,6 +27,7 @@
 #include "linklist.h"
 #include "vty.h"
 #include "command.h"
+#include "bfd.h"
 
 #include "ospf6_proto.h"
 #include "ospf6_lsa.h"
@@ -103,6 +104,8 @@ ospf6_neighbor_create (u_int32_t router_id, struct ospf6_interface *oi)
   on->lsack_list = ospf6_lsdb_create (on);
 
   listnode_add_sort (oi->neighbor_list, on);
+
+  ospf6_bfd_info_nbr_create(oi, on);
   return on;
 }
 
@@ -139,6 +142,7 @@ ospf6_neighbor_delete (struct ospf6_neighbor *on)
   THREAD_OFF (on->thread_send_lsupdate);
   THREAD_OFF (on->thread_send_lsack);
 
+  bfd_info_free(&on->bfd_info);
   XFREE (MTYPE_OSPF6_NEIGHBOR, on);
 }
 
@@ -815,6 +819,7 @@ ospf6_neighbor_show_detail (struct vty *vty, struct ospf6_neighbor *on)
        lsa = ospf6_lsdb_next (lsa))
     vty_out (vty, "      %s%s", lsa->name, VNL);
 
+  bfd_show_info(vty, on->bfd_info, 0, 1);
 }
 
 DEFUN (show_ipv6_ospf6_neighbor,

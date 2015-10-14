@@ -31,6 +31,7 @@
 #include "plist.h"
 #include "log.h"
 #include "zclient.h"
+#include "bfd.h"
 
 #include "ospfd/ospfd.h"
 #include "ospfd/ospf_asbr.h"
@@ -3355,6 +3356,8 @@ show_ip_ospf_interface_sub (struct vty *vty, struct ospf *ospf,
       vty_out (vty, "  Neighbor Count is %d, Adjacent neighbor count is %d%s",
 	       ospf_nbr_count (oi, 0), ospf_nbr_count (oi, NSM_Full),
 	       VTY_NEWLINE);
+
+      ospf_bfd_interface_show(vty, ifp);
     }
 }
 
@@ -3782,6 +3785,7 @@ show_ip_ospf_neighbor_detail_sub (struct vty *vty, struct ospf_interface *oi,
   /* Show Link State Update Retransmission thread. */
   vty_out (vty, "    Thread Link State Update Retransmission %s%s%s",
 	   nbr->t_ls_upd != NULL ? "on" : "off", VTY_NEWLINE, VTY_NEWLINE);
+  bfd_show_info(vty, nbr->bfd_info, 0, 1);
 }
 
 static int

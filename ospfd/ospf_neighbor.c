@@ -98,6 +98,7 @@ ospf_nbr_new (struct ospf_interface *oi)
 
   nbr->crypt_seqnum = 0;
 
+  ospf_bfd_info_nbr_create(oi, nbr);
   return nbr;
 }
 
@@ -141,6 +142,7 @@ ospf_nbr_free (struct ospf_neighbor *nbr)
   /* Cancel all events. *//* Thread lookup cost would be negligible. */
   thread_cancel_event (master, nbr);
 
+  bfd_info_free(&nbr->bfd_info);
   XFREE (MTYPE_OSPF_NEIGHBOR, nbr);
 }
 
