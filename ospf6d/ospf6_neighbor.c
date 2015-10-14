@@ -142,7 +142,7 @@ ospf6_neighbor_delete (struct ospf6_neighbor *on)
   THREAD_OFF (on->thread_send_lsupdate);
   THREAD_OFF (on->thread_send_lsack);
 
-  bfd_info_free(&on->bfd_info);
+  ospf6_bfd_reg_dereg_nbr(on, ZEBRA_BFD_DEST_DEREGISTER);
   XFREE (MTYPE_OSPF6_NEIGHBOR, on);
 }
 

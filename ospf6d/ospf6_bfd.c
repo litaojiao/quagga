@@ -50,7 +50,7 @@ extern struct zclient *zclient;
  *                           zebra for starting/stopping the monitoring of
  *                           the neighbor rechahability.
  */
-static void
+void
 ospf6_bfd_reg_dereg_nbr (struct ospf6_neighbor *on, int command)
 {
   struct ospf6_interface *oi = on->ospf6_if;
@@ -58,7 +58,7 @@ ospf6_bfd_reg_dereg_nbr (struct ospf6_neighbor *on, int command)
   struct bfd_info *bfd_info;
   char src[64];
 
-  if (!oi->bfd_info)
+  if (!oi->bfd_info || !on->bfd_info)
     return;
   bfd_info = (struct bfd_info *)oi->bfd_info;
 
@@ -72,6 +72,9 @@ ospf6_bfd_reg_dereg_nbr (struct ospf6_neighbor *on, int command)
   bfd_peer_sendmsg (zclient, bfd_info, AF_INET6, &on->linklocal_addr,
                     on->ospf6_if->linklocal_addr, ifp->name,
                     0, 0, command, 0);
+
+  if (command == ZEBRA_BFD_DEST_DEREGISTER)
+    bfd_info_free(&on->bfd_info);
 }
 
 /*
@@ -102,13 +105,15 @@ ospf6_bfd_reg_dereg_all_nbr (struct ospf6_interface *oi, int command)
 
   for (ALL_LIST_ELEMENTS_RO (oi->neighbor_list, node, on))
     {
-      if (command != ZEBRA_BFD_DEST_DEREGISTER)
+      if (command == ZEBRA_BFD_DEST_REGISTER)
         ospf6_bfd_info_nbr_create(oi, on);
-      else
-        bfd_info_free(&on->bfd_info);
 
       if (on->state < OSPF6_NEIGHBOR_TWOWAY)
-        continue;
+        {
+          if (command == ZEBRA_BFD_DEST_DEREGISTER)
+            bfd_info_free(&on->bfd_info);
+          continue;
+        }
 
       ospf6_bfd_reg_dereg_nbr(on, command);
     }

@@ -36,4 +36,6 @@ ospf6_bfd_write_config(struct vty *vty, struct ospf6_interface *oi);
 void
 ospf6_bfd_info_nbr_create (struct ospf6_interface *oi,
                             struct ospf6_neighbor *on);
+extern void
+ospf6_bfd_reg_dereg_nbr (struct ospf6_neighbor *on, int command);
 #endif /* OSPF6_BFD_H */
