@@ -1420,7 +1420,6 @@ bgp_fsm_holdtime_expire (struct peer *peer)
 static int
 bgp_establish (struct peer *peer)
 {
-  struct bgp_notify *notify;
   struct peer_af *paf;
   afi_t afi;
   safi_t safi;
@@ -1442,12 +1441,6 @@ bgp_establish (struct peer *peer)
   /* Reset capability open status flag. */
   if (! CHECK_FLAG (peer->sflags, PEER_STATUS_CAPABILITY_OPEN))
     SET_FLAG (peer->sflags, PEER_STATUS_CAPABILITY_OPEN);
-
-  /* Clear last notification data. */
-  notify = &peer->notify;
-  if (notify->data)
-    XFREE (MTYPE_TMP, notify->data);
-  memset (notify, 0, sizeof (struct bgp_notify));
 
   /* Clear start timer value to default. */
   peer->v_start = BGP_INIT_START_TIMER;
