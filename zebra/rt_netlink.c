@@ -1497,12 +1497,15 @@ _netlink_route_build_singlepath(
       addattr_l (nlmsg, req_size, RTA_GATEWAY, &ipv4_ll, 4);
       addattr32 (nlmsg, req_size, RTA_OIF, nexthop->ifindex);
 
-      if (nexthop->rmap_src.ipv4.s_addr && (cmd == RTM_NEWROUTE))
-        addattr_l (nlmsg, req_size, RTA_PREFSRC,
-                   &nexthop->rmap_src.ipv4, bytelen);
-      else if (nexthop->src.ipv4.s_addr && (cmd == RTM_NEWROUTE))
-        addattr_l (nlmsg, req_size, RTA_PREFSRC,
-                   &nexthop->src.ipv4, bytelen);
+      if (cmd == RTM_NEWROUTE)
+	{
+	  if (nexthop->rmap_src.ipv4.s_addr)
+	    addattr_l (nlmsg, req_size, RTA_PREFSRC,
+		       &nexthop->rmap_src.ipv4, bytelen);
+	  else if (nexthop->src.ipv4.s_addr)
+	    addattr_l (nlmsg, req_size, RTA_PREFSRC,
+		       &nexthop->src.ipv4, bytelen);
+	}
 
       if (IS_ZEBRA_DEBUG_KERNEL)
         zlog_debug(" 5549: _netlink_route_build_singlepath() (%s): "
@@ -1520,12 +1523,15 @@ _netlink_route_build_singlepath(
       addattr_l (nlmsg, req_size, RTA_GATEWAY,
                  &nexthop->gate.ipv4, bytelen);
 
-      if (nexthop->rmap_src.ipv4.s_addr && (cmd == RTM_NEWROUTE))
-        addattr_l (nlmsg, req_size, RTA_PREFSRC,
-                   &nexthop->rmap_src.ipv4, bytelen);
-      else if (nexthop->src.ipv4.s_addr && (cmd == RTM_NEWROUTE))
-        addattr_l (nlmsg, req_size, RTA_PREFSRC,
-                   &nexthop->src.ipv4, bytelen);
+      if (cmd == RTM_NEWROUTE)
+	{
+	  if (nexthop->rmap_src.ipv4.s_addr)
+	    addattr_l (nlmsg, req_size, RTA_PREFSRC,
+		       &nexthop->rmap_src.ipv4, bytelen);
+	  else if (nexthop->src.ipv4.s_addr)
+	    addattr_l (nlmsg, req_size, RTA_PREFSRC,
+		       &nexthop->src.ipv4, bytelen);
+	}
 
       if (IS_ZEBRA_DEBUG_KERNEL)
         zlog_debug("netlink_route_multipath() (%s): "
@@ -1542,6 +1548,16 @@ _netlink_route_build_singlepath(
       addattr_l (nlmsg, req_size, RTA_GATEWAY,
                  &nexthop->gate.ipv6, bytelen);
 
+      if (cmd == RTM_NEWROUTE)
+	{
+	  if (!IN6_IS_ADDR_UNSPECIFIED(&nexthop->rmap_src.ipv6))
+	    addattr_l (nlmsg, req_size, RTA_PREFSRC,
+		       &nexthop->rmap_src.ipv6, bytelen);
+	  else if (!IN6_IS_ADDR_UNSPECIFIED(&nexthop->src.ipv6))
+	    addattr_l (nlmsg, req_size, RTA_PREFSRC,
+		       &nexthop->src.ipv6, bytelen);
+	}
+
       if (IS_ZEBRA_DEBUG_KERNEL)
         zlog_debug("netlink_route_multipath() (%s): "
                    "nexthop via %s if %u",
@@ -1556,12 +1572,15 @@ _netlink_route_build_singlepath(
     {
       addattr32 (nlmsg, req_size, RTA_OIF, nexthop->ifindex);
 
-      if (nexthop->rmap_src.ipv4.s_addr && (cmd == RTM_NEWROUTE))
-        addattr_l (nlmsg, req_size, RTA_PREFSRC,
-                   &nexthop->rmap_src.ipv4, bytelen);
-      else if (nexthop->src.ipv4.s_addr && (cmd == RTM_NEWROUTE))
-        addattr_l (nlmsg, req_size, RTA_PREFSRC,
-                   &nexthop->src.ipv4, bytelen);
+      if (cmd == RTM_NEWROUTE)
+	{
+	  if (nexthop->rmap_src.ipv4.s_addr)
+	    addattr_l (nlmsg, req_size, RTA_PREFSRC,
+		       &nexthop->rmap_src.ipv4, bytelen);
+	  else if (nexthop->src.ipv4.s_addr)
+	    addattr_l (nlmsg, req_size, RTA_PREFSRC,
+		       &nexthop->src.ipv4, bytelen);
+	}
 
       if (IS_ZEBRA_DEBUG_KERNEL)
         zlog_debug("netlink_route_multipath() (%s): "
@@ -1572,6 +1591,16 @@ _netlink_route_build_singlepath(
       || nexthop->type == NEXTHOP_TYPE_IPV6_IFNAME)
     {
       addattr32 (nlmsg, req_size, RTA_OIF, nexthop->ifindex);
+
+      if (cmd == RTM_NEWROUTE)
+	{
+	  if (!IN6_IS_ADDR_UNSPECIFIED(&nexthop->rmap_src.ipv6))
+	    addattr_l (nlmsg, req_size, RTA_PREFSRC,
+		       &nexthop->rmap_src.ipv6, bytelen);
+	  else if (!IN6_IS_ADDR_UNSPECIFIED(&nexthop->src.ipv6))
+	    addattr_l (nlmsg, req_size, RTA_PREFSRC,
+		       &nexthop->src.ipv6, bytelen);
+	}
 
       if (IS_ZEBRA_DEBUG_KERNEL)
         zlog_debug("netlink_route_multipath() (%s): "
@@ -1669,6 +1698,12 @@ _netlink_route_build_multipath(
       rta_addattr_l (rta, NL_PKT_BUF_SIZE, RTA_GATEWAY,
                      &nexthop->gate.ipv6, bytelen);
       rtnh->rtnh_len += sizeof (struct rtattr) + bytelen;
+
+      if (!IN6_IS_ADDR_UNSPECIFIED(&nexthop->rmap_src.ipv6))
+        *src = &nexthop->rmap_src;
+      else if (!IN6_IS_ADDR_UNSPECIFIED(&nexthop->src.ipv6))
+	*src = &nexthop->src;
+
       if (IS_ZEBRA_DEBUG_KERNEL)
         zlog_debug("netlink_route_multipath() (%s): "
                    "nexthop via %s if %u",
@@ -1872,19 +1907,34 @@ netlink_route_multipath (int cmd, struct prefix *p, struct rib *rib,
         {
           if (CHECK_FLAG (nexthop->flags, NEXTHOP_FLAG_RECURSIVE))
             {
-              /* This only works for IPv4 now */
               if (!setsrc)
                  {
-                  if (nexthop->rmap_src.ipv4.s_addr != 0)
-                    {
-                      src.ipv4 = nexthop->rmap_src.ipv4;
-                      setsrc = 1;
-                    }
-                  else if (nexthop->src.ipv4.s_addr != 0)
-                    {
-                      src.ipv4 = nexthop->src.ipv4;
-                      setsrc = 1;
-                    }
+		   if (family == AF_INET)
+		     {
+		       if (nexthop->rmap_src.ipv4.s_addr != 0)
+			 {
+			   src.ipv4 = nexthop->rmap_src.ipv4;
+			   setsrc = 1;
+			 }
+		       else if (nexthop->src.ipv4.s_addr != 0)
+			 {
+			   src.ipv4 = nexthop->src.ipv4;
+			   setsrc = 1;
+			 }
+		     }
+		   else if (family == AF_INET6)
+		     {
+		       if (!IN6_IS_ADDR_UNSPECIFIED(&nexthop->rmap_src.ipv6))
+			 {
+			   src.ipv6 = nexthop->rmap_src.ipv6;
+			   setsrc = 1;
+			 }
+		       else if (!IN6_IS_ADDR_UNSPECIFIED(&nexthop->src.ipv6))
+			 {
+			   src.ipv6 = nexthop->src.ipv6;
+			   setsrc = 1;
+			 }
+		     }
                  }
               continue;
 	    }
@@ -1909,7 +1959,12 @@ netlink_route_multipath (int cmd, struct prefix *p, struct rib *rib,
             }
         }
       if (setsrc && (cmd == RTM_NEWROUTE))
-	addattr_l (&req.n, sizeof req, RTA_PREFSRC, &src.ipv4, bytelen);
+	{
+	  if (family == AF_INET)
+	    addattr_l (&req.n, sizeof req, RTA_PREFSRC, &src.ipv4, bytelen);
+	  else if (family == AF_INET6)
+	    addattr_l (&req.n, sizeof req, RTA_PREFSRC, &src.ipv6, bytelen);
+	}
     }
   else
     {
@@ -1933,16 +1988,32 @@ netlink_route_multipath (int cmd, struct prefix *p, struct rib *rib,
               /* This only works for IPv4 now */
               if (!setsrc)
                  {
-                  if (nexthop->rmap_src.ipv4.s_addr != 0)
-                    {
-                      src.ipv4 = nexthop->rmap_src.ipv4;
-                      setsrc = 1;
-                    }
-                  else if (nexthop->src.ipv4.s_addr != 0)
-                    {
-                      src.ipv4 = nexthop->src.ipv4;
-                      setsrc = 1;
-                    }
+		   if (family == AF_INET)
+		     {
+		       if (nexthop->rmap_src.ipv4.s_addr != 0)
+			 {
+			   src.ipv4 = nexthop->rmap_src.ipv4;
+			   setsrc = 1;
+			 }
+		       else if (nexthop->src.ipv4.s_addr != 0)
+			 {
+			   src.ipv4 = nexthop->src.ipv4;
+			   setsrc = 1;
+			 }
+		     }
+		   else if (family == AF_INET6)
+		     {
+		       if (!IN6_IS_ADDR_UNSPECIFIED(&nexthop->rmap_src.ipv6))
+			 {
+			   src.ipv6 = nexthop->rmap_src.ipv6;
+			   setsrc = 1;
+			 }
+		       else if (!IN6_IS_ADDR_UNSPECIFIED(&nexthop->src.ipv6))
+			 {
+			   src.ipv6 = nexthop->src.ipv6;
+			   setsrc = 1;
+			 }
+		     }
                  }
 	      continue;
 	    }
@@ -1966,13 +2037,23 @@ netlink_route_multipath (int cmd, struct prefix *p, struct rib *rib,
 
 	      if (!setsrc && src1)
 		{
-		  src.ipv4 = src1->ipv4;
+		  if (family == AF_INET)
+		    src.ipv4 = src1->ipv4;
+		  else if (family == AF_INET6)
+		    src.ipv6 = src1->ipv6;
+
 		  setsrc = 1;
 		}
             }
         }
       if (setsrc && (cmd == RTM_NEWROUTE))
-	addattr_l (&req.n, sizeof req, RTA_PREFSRC, &src.ipv4, bytelen);
+	{
+	  if (family == AF_INET)
+	    addattr_l (&req.n, sizeof req, RTA_PREFSRC, &src.ipv4, bytelen);
+	  else if (family == AF_INET6)
+	    addattr_l (&req.n, sizeof req, RTA_PREFSRC, &src.ipv6, bytelen);
+	  zlog_debug("Setting source");
+	}
 
       if (rta->rta_len > RTA_LENGTH (0))
         addattr_l (&req.n, NL_PKT_BUF_SIZE, RTA_MULTIPATH, RTA_DATA (rta),
