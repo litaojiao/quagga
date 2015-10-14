@@ -832,7 +832,7 @@ bgp_nexthop_set (union sockunion *local, union sockunion *remote,
 
   nexthop->ifp = ifp;
 
-  /* IPv4 connection. */
+  /* IPv4 connection, fetch and store IPv6 local address(es) if any. */
   if (local->sa.sa_family == AF_INET)
     {
 #ifdef HAVE_IPV6
@@ -848,7 +848,7 @@ bgp_nexthop_set (union sockunion *local, union sockunion *remote,
     }
 
 #ifdef HAVE_IPV6
-  /* IPv6 connection. */
+  /* IPv6 connection, fetch and store IPv4 local address if any. */
   if (local->sa.sa_family == AF_INET6)
     {
       struct interface *direct = NULL;
@@ -910,7 +910,9 @@ bgp_nexthop_set (union sockunion *local, union sockunion *remote,
     }
 #endif /* KAME */
 #endif /* HAVE_IPV6 */
-  return ret;
+
+  /* If we have identified the local interface, there is no error for now. */
+  return 0;
 }
 
 static struct in6_addr *
