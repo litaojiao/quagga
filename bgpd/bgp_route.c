@@ -7256,15 +7256,11 @@ route_vty_out_detail (struct vty *vty, struct bgp *bgp, struct prefix *p,
               json_object_string_add(json_peer, "routerId", inet_ntop (AF_INET, &binfo->peer->remote_id, buf1, BUFSIZ));
 
 	      if (binfo->peer->hostname)
-		{
-		  json_string = json_object_new_string(binfo->peer->hostname);
-		  json_object_object_add(json_path, "peer-hostname", json_string);
-		}
+                json_object_string_add(json_peer, "hostname", binfo->peer->hostname);
+
 	      if (binfo->peer->domainname)
-		{
-		  json_string = json_object_new_string(binfo->peer->domainname);
-		  json_object_object_add(json_path, "peer-domainname", json_string);
-		}
+                json_object_string_add(json_peer, "domainname", binfo->peer->domainname);
+
               if (binfo->peer->conf_if)
                 json_object_string_add(json_peer, "interface", binfo->peer->conf_if);
             }
@@ -8059,7 +8055,7 @@ route_vty_out_detail_header (struct vty *vty, struct bgp *bgp,
               json_peer = json_object_new_object();
 
 	      if (peer->hostname)
-		json_object_string_add(json_peer, "hostname", peer->hostname);
+                json_object_string_add(json_peer, "hostname", peer->hostname);
 
               if (!json_adv_to)
                 json_adv_to = json_object_new_object();

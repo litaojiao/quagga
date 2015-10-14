@@ -8655,10 +8655,10 @@ bgp_show_summary (struct vty *vty, struct bgp *bgp, int afi, int safi,
                 json_object_boolean_true_add(json_peer, "dynamicPeer");
 
 	      if (peer->hostname)
-		json_object_string_add(json_peer, "hostname", peer->hostname);
+                json_object_string_add(json_peer, "hostname", peer->hostname);
 
 	      if (peer->domainname)
-		json_object_string_add(json_peer, "domainname", peer->domainname);
+                json_object_string_add(json_peer, "domainname", peer->domainname);
 
               json_object_int_add(json_peer, "remoteAs", peer->as);
               json_object_int_add(json_peer, "version", 4);
@@ -9410,7 +9410,7 @@ bgp_show_peer (struct vty *vty, struct peer *p)
 	vty_out(vty, "Hostname: %s%s", p->hostname, VTY_NEWLINE);
     }
 
-  /* Peer-group */
+      /* Peer-group */
   if (p->group)
     {
       vty_out (vty, " Member of peer-group %s for session parameters%s",

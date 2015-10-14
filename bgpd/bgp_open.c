@@ -560,7 +560,6 @@ bgp_capability_hostname (struct peer *peer, struct capability_header *hdr)
   struct stream *s = BGP_INPUT (peer);
   char str[BGP_MAX_HOSTNAME+1];
   size_t end = stream_get_getp (s) + hdr->length;
-  char c;
   u_char len;
 
   SET_FLAG(peer->cap, PEER_CAP_HOSTNAME_RCV);

@@ -1279,6 +1279,7 @@ bgp_peer_conf_if_to_su_update (struct peer *peer)
       if (!peer_addr_updated)
         peer_addr_updated = bgp_peer_conf_if_to_su_update_v6 (peer, ifp);
     }
+
   /* If we could derive the peer address, we may need to install the password
    * configured for the peer, if any, on the listen socket. Otherwise, mark
    * that peer's address is not available and uninstall the password, if
