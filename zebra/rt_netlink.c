@@ -780,7 +780,6 @@ netlink_routing_table (struct sockaddr_nl *snl, struct nlmsghdr *h)
               if (len < (int) sizeof (*rtnh) || rtnh->rtnh_len > len)
                 break;
 
-              rib->nexthop_num++;
               index = rtnh->rtnh_ifindex;
               gate = 0;
               if (rtnh->rtnh_len > sizeof (*rtnh))
@@ -806,6 +805,7 @@ netlink_routing_table (struct sockaddr_nl *snl, struct nlmsghdr *h)
               rtnh = RTNH_NEXT(rtnh);
             }
 
+	  zserv_nexthop_num_warn(__func__, &p, rib->nexthop_num);
           if (rib->nexthop_num == 0)
             XFREE (MTYPE_RIB, rib);
           else
@@ -983,7 +983,6 @@ netlink_route_change (struct sockaddr_nl *snl, struct nlmsghdr *h)
                   if (len < (int) sizeof (*rtnh) || rtnh->rtnh_len > len)
                     break;
 
-                  rib->nexthop_num++;
                   index = rtnh->rtnh_ifindex;
                   gate = 0;
                   if (rtnh->rtnh_len > sizeof (*rtnh))
@@ -1008,6 +1007,8 @@ netlink_route_change (struct sockaddr_nl *snl, struct nlmsghdr *h)
                   len -= NLMSG_ALIGN(rtnh->rtnh_len);
                   rtnh = RTNH_NEXT(rtnh);
                 }
+
+	      zserv_nexthop_num_warn(__func__, &p, rib->nexthop_num);
 
               if (rib->nexthop_num == 0)
                 XFREE (MTYPE_RIB, rib);

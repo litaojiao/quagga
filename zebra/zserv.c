@@ -1023,6 +1023,18 @@ zread_interface_delete (struct zserv *client, u_short length)
   return 0;
 }
 
+void
+zserv_nexthop_num_warn (const char *caller, const struct prefix *p, const u_char nexthop_num)
+{
+  if ((MULTIPATH_NUM != 0) && (nexthop_num > MULTIPATH_NUM))
+    {
+      char buff[80];
+      prefix2str(p, buff, 80);
+      zlog_warn("%s: Prefix %s has %d nexthops, but we can only use the first %d",
+		caller, buff, nexthop_num, MULTIPATH_NUM);
+    }
+}
+
 /* This function support multiple nexthop. */
 /* 
  * Parse the ZEBRA_IPV4_ROUTE_ADD sent from client. Update rib and
@@ -1068,6 +1080,7 @@ zread_ipv4_add (struct zserv *client, u_short length)
   if (CHECK_FLAG (message, ZAPI_MESSAGE_NEXTHOP))
     {
       nexthop_num = stream_getc (s);
+      zserv_nexthop_num_warn(__func__, (const struct prefix *)&p, nexthop_num);
 
       for (i = 0; i < nexthop_num; i++)
 	{
@@ -1264,7 +1277,6 @@ zread_ipv4_route_ipv6_nexthop_add (struct zserv *client, u_short length)
   u_char nexthop_type;
   unsigned long ifindex;
   struct prefix_ipv4 p;
-  u_char ifname_len;
   safi_t safi;
   static struct in6_addr nexthops[MULTIPATH_NUM];
   static unsigned int ifindices[MULTIPATH_NUM];
@@ -1304,6 +1316,7 @@ zread_ipv4_route_ipv6_nexthop_add (struct zserv *client, u_short length)
       int max_nh_if = 0;
 
       nexthop_num = stream_getc (s);
+      zserv_nexthop_num_warn(__func__, (const struct prefix *)&p, nexthop_num);
       for (i = 0; i < nexthop_num; i++)
 	{
 	  nexthop_type = stream_getc (s);
@@ -1425,7 +1438,8 @@ zread_ipv6_add (struct zserv *client, u_short length)
       int max_nh_if = 0;
 
       nexthop_num = stream_getc (s);
-      for (i = 0; i < nexthop_num; i++)
+      zserv_nexthop_num_warn(__func__, (const struct prefix *)&p, nexthop_num);
+      for (i = 0; i < nexthop_num; i++) 
 	{
 	  nexthop_type = stream_getc (s);
 
