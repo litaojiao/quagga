@@ -628,6 +628,12 @@ zapi_ipv4_route (u_char cmd, struct zclient *zclient, struct prefix_ipv4 *p,
   return zclient_send_message(zclient);
 }
 
+int
+zapi_read_redist_ipv4 (u_char cmd, struct zclient *zclient, zebra_size_t len)
+{
+
+}
+
 #ifdef HAVE_IPV6
 int
 zapi_ipv4_route_ipv6_nexthop (u_char cmd, struct zclient *zclient,
@@ -1259,6 +1265,22 @@ zclient_read (struct thread *thread)
     case ZEBRA_BFD_DEST_REPLAY:
       if (zclient->bfd_dest_replay)
 	(*zclient->bfd_dest_replay) (command, zclient, length);
+      break;
+    case ZEBRA_REDISTRIBUTE_IPV4_ADD:
+      if (zclient->redistribute_route_ipv4_add)
+	(*zclient->redistribute_route_ipv4_add) (command, zclient, length);
+      break;
+    case ZEBRA_REDISTRIBUTE_IPV4_DEL:
+      if (zclient->redistribute_route_ipv4_del)
+	(*zclient->redistribute_route_ipv4_del) (command, zclient, length);
+      break;
+    case ZEBRA_REDISTRIBUTE_IPV6_ADD:
+      if (zclient->redistribute_route_ipv6_add)
+	(*zclient->redistribute_route_ipv6_add) (command, zclient, length);
+      break;
+    case ZEBRA_REDISTRIBUTE_IPV6_DEL:
+      if (zclient->redistribute_route_ipv6_del)
+	(*zclient->redistribute_route_ipv6_del) (command, zclient, length);
       break;
     default:
       break;
