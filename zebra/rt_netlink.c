@@ -503,6 +503,9 @@ netlink_interface (struct sockaddr_nl *snl, struct nlmsghdr *h)
   if (len < 0)
     return -1;
 
+  if (ifi->ifi_family == AF_BRIDGE)
+    return 0;
+
   /* Looking up interface name. */
   memset (tb, 0, sizeof tb);
   netlink_parse_rtattr (tb, IFLA_MAX, IFLA_RTA (ifi), len);
@@ -1076,6 +1079,9 @@ netlink_link_change (struct sockaddr_nl *snl, struct nlmsghdr *h)
   len = h->nlmsg_len - NLMSG_LENGTH (sizeof (struct ifinfomsg));
   if (len < 0)
     return -1;
+
+  if (ifi->ifi_family == AF_BRIDGE)
+    return 0;
 
   /* Looking up interface name. */
   memset (tb, 0, sizeof tb);
