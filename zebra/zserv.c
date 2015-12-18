@@ -1907,6 +1907,9 @@ zebra_client_read (struct thread *thread)
     case ZEBRA_BFD_DEST_DEREGISTER:
       zebra_ptm_bfd_dst_deregister(client, sock, length);
       break;
+    case ZEBRA_BFD_CLIENT_REGISTER:
+      zebra_ptm_bfd_client_register(client, sock, length);
+      break;
     default:
       zlog_info ("Zebra received unknown command %d", command);
       break;

@@ -138,7 +138,7 @@ ospf_bfd_reg_dereg_all_nbr (struct interface *ifp, int command)
  *                       to zebra
  */
 static int
-ospf_bfd_nbr_replay (int command, struct zclient *client, zebra_size_t length)
+ospf_bfd_nbr_replay (int command, struct zclient *zclient, zebra_size_t length)
 {
   struct listnode *inode, *node, *onode;
   struct ospf *ospf;
@@ -152,6 +152,9 @@ ospf_bfd_nbr_replay (int command, struct zclient *client, zebra_size_t length)
     {
       zlog_debug("Zebra: BFD Dest replay request");
     }
+
+  /* Send the client registration */
+  bfd_client_sendmsg(zclient, ZEBRA_BFD_CLIENT_REGISTER);
 
   /* Replay the neighbor, if BFD is enabled in BGP */
   for (ALL_LIST_ELEMENTS (om->ospf, node, onode, ospf))
@@ -412,4 +415,7 @@ ospf_bfd_init(void)
   install_element (INTERFACE_NODE, &ip_ospf_bfd_cmd);
   install_element (INTERFACE_NODE, &ip_ospf_bfd_param_cmd);
   install_element (INTERFACE_NODE, &no_ip_ospf_bfd_cmd);
+
+  /* Send the client registration */
+  bfd_client_sendmsg(zclient, ZEBRA_BFD_CLIENT_REGISTER);
 }

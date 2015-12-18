@@ -61,4 +61,6 @@ int zebra_ptm_bfd_dst_register (struct zserv *client, int sock, u_short length,
 int zebra_ptm_bfd_dst_deregister (struct zserv *client, int sock, u_short length);
 void
 zebra_ptm_show_status(struct vty *vty, struct interface *ifp);
+int zebra_ptm_bfd_client_register (struct zserv *client, int sock,
+                                    u_short length);
 #endif

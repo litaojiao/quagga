@@ -124,7 +124,7 @@ ospf6_bfd_reg_dereg_all_nbr (struct ospf6_interface *oi, int command)
  *                        to zebra
  */
 static int
-ospf6_bfd_nbr_replay (int command, struct zclient *client, zebra_size_t length)
+ospf6_bfd_nbr_replay (int command, struct zclient *zclient, zebra_size_t length)
 {
   struct listnode *inode, *nnode;
   struct interface *ifp;
@@ -134,6 +134,9 @@ ospf6_bfd_nbr_replay (int command, struct zclient *client, zebra_size_t length)
 
   if (IS_OSPF6_DEBUG_ZEBRA(RECV))
     zlog_debug("Zebra: BFD Dest replay request");
+
+  /* Send the client registration */
+  bfd_client_sendmsg(zclient, ZEBRA_BFD_CLIENT_REGISTER);
 
   /* Replay the neighbor, if BFD is enabled on the interface*/
   for (ALL_LIST_ELEMENTS_RO (iflist, inode, ifp))
@@ -393,4 +396,7 @@ ospf6_bfd_init(void)
   install_element (INTERFACE_NODE, &ipv6_ospf6_bfd_cmd);
   install_element (INTERFACE_NODE, &ipv6_ospf6_bfd_param_cmd);
   install_element (INTERFACE_NODE, &no_ipv6_ospf6_bfd_cmd);
+
+  /* Send the client registration */
+  bfd_client_sendmsg(zclient, ZEBRA_BFD_CLIENT_REGISTER);
 }

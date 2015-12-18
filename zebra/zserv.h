@@ -97,6 +97,7 @@ struct zserv
   u_int32_t bfd_peer_upd8_cnt;
   u_int32_t bfd_peer_del_cnt;
   u_int32_t bfd_peer_replay_cnt;
+  u_int32_t bfd_client_reg_cnt;
 
   time_t connect_time;
   time_t last_read_time;
