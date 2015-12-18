@@ -1772,10 +1772,11 @@ ospf_ls_upd (struct ip *iph, struct ospf_header *ospfh,
   /* Check neighbor state. */
   if (nbr->state < NSM_Exchange)
     {
-      zlog_warn ("Link State Update: "
-      		 "Neighbor[%s] state %s is less than Exchange",
-		 inet_ntoa (ospfh->router_id),
-		 LOOKUP(ospf_nsm_state_msg, nbr->state));
+      if (IS_DEBUG_OSPF (nsm, NSM_EVENTS))
+	zlog_debug ("Link State Update: "
+		    "Neighbor[%s] state %s is less than Exchange",
+		    inet_ntoa (ospfh->router_id),
+		    LOOKUP(ospf_nsm_state_msg, nbr->state));
       return;
     }
 
@@ -2136,10 +2137,11 @@ ospf_ls_ack (struct ip *iph, struct ospf_header *ospfh,
 
   if (nbr->state < NSM_Exchange)
     {
-      zlog_warn ("Link State Acknowledgment: "
-      		 "Neighbor[%s] state %s is less than Exchange",
-		 inet_ntoa (ospfh->router_id),
-		 LOOKUP(ospf_nsm_state_msg, nbr->state));
+      if (IS_DEBUG_OSPF (nsm, NSM_EVENTS))
+	zlog_debug ("Link State Acknowledgment: "
+		    "Neighbor[%s] state %s is less than Exchange",
+		    inet_ntoa (ospfh->router_id),
+		    LOOKUP(ospf_nsm_state_msg, nbr->state));
       return;
     }
   
