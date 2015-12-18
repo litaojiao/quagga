@@ -214,7 +214,7 @@ connected_up_ipv4 (struct interface *ifp, struct connected *ifc)
   rib_add_ipv4 (ZEBRA_ROUTE_CONNECT, 0, 0, &p, NULL, NULL, ifp->ifindex,
 	RT_TABLE_MAIN, ifp->metric, 0, SAFI_MULTICAST);
 
-  if (IS_ZEBRA_DEBUG_RIB)
+  if (IS_ZEBRA_DEBUG_RIB_DETAILED)
     zlog_debug ("%s: calling rib_update", __func__);
 
   rib_update ();
@@ -331,7 +331,7 @@ connected_down_ipv4 (struct interface *ifp, struct connected *ifc)
 
   rib_delete_ipv4 (ZEBRA_ROUTE_CONNECT, 0, 0, &p, NULL, ifp->ifindex, 0, SAFI_MULTICAST);
 
-  if (IS_ZEBRA_DEBUG_RIB)
+  if (IS_ZEBRA_DEBUG_RIB_DETAILED)
     zlog_debug ("%s: calling rib_update_static", __func__);
 
   rib_update_static ();
@@ -394,7 +394,7 @@ connected_delete_ipv4 (struct interface *ifp, int flags, struct in_addr *addr,
 
   connected_withdraw (ifc);
 
-  if (IS_ZEBRA_DEBUG_RIB)
+  if (IS_ZEBRA_DEBUG_RIB_DETAILED)
     zlog_debug ("%s: calling rib_update_static", __func__);
 
   rib_update_static();
@@ -423,7 +423,7 @@ connected_up_ipv6 (struct interface *ifp, struct connected *ifc)
   rib_add_ipv6 (ZEBRA_ROUTE_CONNECT, 0, 0, &p, NULL, ifp->ifindex, RT_TABLE_MAIN,
                 ifp->metric, 0, SAFI_UNICAST);
 
-  if (IS_ZEBRA_DEBUG_RIB)
+  if (IS_ZEBRA_DEBUG_RIB_DETAILED)
     zlog_debug ("%s: calling rib_update", __func__);
 
   rib_update ();
@@ -511,7 +511,7 @@ connected_down_ipv6 (struct interface *ifp, struct connected *ifc)
 
   rib_delete_ipv6 (ZEBRA_ROUTE_CONNECT, 0, 0, &p, NULL, ifp->ifindex, 0, SAFI_UNICAST);
 
-  if (IS_ZEBRA_DEBUG_RIB)
+  if (IS_ZEBRA_DEBUG_RIB_DETAILED)
     zlog_debug ("%s: calling rib_update_static", __func__);
 
   rib_update_static ();
@@ -535,7 +535,7 @@ connected_delete_ipv6 (struct interface *ifp, struct in6_addr *address,
 
   connected_withdraw (ifc);
 
-  if (IS_ZEBRA_DEBUG_RIB)
+  if (IS_ZEBRA_DEBUG_RIB_DETAILED)
     zlog_debug ("%s: calling rib_update_static", __func__);
 
   rib_update_static();

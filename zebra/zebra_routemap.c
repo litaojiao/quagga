@@ -759,7 +759,7 @@ DEFUN (ip_protocol,
     }
   proto_rm[AFI_IP][i] = XSTRDUP (MTYPE_ROUTE_MAP_NAME, argv[1]);
 
-  if (IS_ZEBRA_DEBUG_RIB)
+  if (IS_ZEBRA_DEBUG_RIB_DETAILED)
     zlog_debug ("%s: calling rib_update", __func__);
 
   rib_update();
@@ -796,7 +796,7 @@ DEFUN (no_ip_protocol,
       XFREE (MTYPE_ROUTE_MAP_NAME, proto_rm[AFI_IP][i]);
       proto_rm[AFI_IP][i] = NULL;
 
-      if (IS_ZEBRA_DEBUG_RIB)
+      if (IS_ZEBRA_DEBUG_RIB_DETAILED)
         zlog_debug ("%s: calling rib_update", __func__);
 
       rib_update();
@@ -872,7 +872,7 @@ DEFUN (ipv6_protocol,
     }
   proto_rm[AFI_IP6][i] = XSTRDUP (MTYPE_ROUTE_MAP_NAME, argv[1]);
 
-  if (IS_ZEBRA_DEBUG_RIB)
+  if (IS_ZEBRA_DEBUG_RIB_DETAILED)
     zlog_debug ("%s: calling rib_update", __func__);
 
   rib_update();
@@ -910,7 +910,7 @@ DEFUN (no_ipv6_protocol,
       XFREE (MTYPE_ROUTE_MAP_NAME, proto_rm[AFI_IP6][i]);
       proto_rm[AFI_IP6][i] = NULL;
 
-      if (IS_ZEBRA_DEBUG_RIB)
+      if (IS_ZEBRA_DEBUG_RIB_DETAILED)
         zlog_debug ("%s: calling rib_update", __func__);
 
       rib_update();
@@ -1584,7 +1584,7 @@ zebra_route_map_update_timer (struct thread *thread)
   if (IS_ZEBRA_DEBUG_EVENT)
     zlog_debug("Event driven route-map update triggered");
 
-  if (IS_ZEBRA_DEBUG_RIB)
+  if (IS_ZEBRA_DEBUG_RIB_DETAILED)
     zlog_debug ("%s: calling rib_update", __func__);
 
   rib_update();
