@@ -1278,15 +1278,17 @@ DEFUN (no_ospf_area_vlink,
 	    }
 	  else if (strncmp (argv[i], "authentication", 14) == 0)
 	    {
-	      /* authentication  - this option can only occur at start
-		                   of command line */
-	      vl_config.auth_type = OSPF_AUTH_NOTSET;
+              /* Determine if delete of a key or disable of authentication */
+              if ((i+1) >= argc)
+                vl_config.auth_type = OSPF_AUTH_NOTSET;
 	    }
 	  break;
 
 	case 'm':
 	  /* message-digest-key */
-	  /* Delete one key */
+	  /* Delete one key - it should be present. */
+          if ((i+1) >= argc)
+            return CMD_WARNING;
 	  i++;
 	  vl_config.crypto_key_id = strtol (argv[i], NULL, 10);
 	  if (vl_config.crypto_key_id < 0)
@@ -1509,7 +1511,7 @@ ALIAS (no_ospf_area_vlink,
        no_ospf_area_vlink_authtype_md5_cmd,
        "no area (A.B.C.D|<0-4294967295>) virtual-link A.B.C.D "
        "(authentication|) "
-       "(message-digest-key|)",
+       "(message-digest-key|) <1-255>",
        NO_STR
        VLINK_HELPSTR_IPADDR
        VLINK_HELPSTR_AUTHTYPE_SIMPLE
