@@ -1805,11 +1805,13 @@ rib_process (struct route_node *rn)
 	}
       else
 	{
-          /* Uninstall prior route here, if needed. */
-          if (fib && !RIB_SYSTEM_ROUTE (fib))
-            rib_uninstall_kernel (rn, fib);
-	  /* if "select", the earlier redist delete wouldn't have happened */
-	  redistribute_delete(&rn->p, select);
+          /* Uninstall prior route here and perform redist delete, if needed. */
+          if (fib)
+            {
+              if (!RIB_SYSTEM_ROUTE (fib))
+                rib_uninstall_kernel (rn, fib);
+	      redistribute_delete(&rn->p, fib);
+            }
 	}
       UNSET_FLAG(select->flags, ZEBRA_FLAG_CHANGED);
     }
