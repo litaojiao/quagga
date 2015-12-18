@@ -436,6 +436,7 @@ zebra_read_ipv4 (int command, struct zclient *zclient, zebra_size_t length)
   struct in_addr nexthop;
   struct prefix_ipv4 p;
   unsigned int ifindex;
+  int i;
 
   s = zclient->ibuf;
   nexthop.s_addr = 0;
@@ -491,6 +492,20 @@ zebra_read_ipv4 (int command, struct zclient *zclient, zebra_size_t length)
 		     api.metric,
 		     api.tag);
 	}
+
+      /*
+       * The ADD message is actually an UPDATE and there is no explicit DEL
+       * for a prior redistributed route, if any. So, perform an implicit
+       * DEL processing for the same redistributed route from any other
+       * source type.
+       */
+      for (i = 0; i < ZEBRA_ROUTE_MAX; i++)
+        {
+          if (i != api.type)
+            bgp_redistribute_delete((struct prefix *)&p, i, api.instance);
+        }
+
+      /* Now perform the add/update. */
       bgp_redistribute_add((struct prefix *)&p, &nexthop, NULL, ifindex,
 			   api.metric, api.type, api.instance, api.tag);
     }
@@ -524,6 +539,7 @@ zebra_read_ipv6 (int command, struct zclient *zclient, zebra_size_t length)
   struct in6_addr nexthop;
   struct prefix_ipv6 p;
   unsigned int ifindex;
+  int i;
 
   s = zclient->ibuf;
   memset (&nexthop, 0, sizeof (struct in6_addr));
@@ -585,6 +601,19 @@ zebra_read_ipv6 (int command, struct zclient *zclient, zebra_size_t length)
 		     api.metric,
 		     api.tag);
 	}
+
+      /*
+       * The ADD message is actually an UPDATE and there is no explicit DEL
+       * for a prior redistributed route, if any. So, perform an implicit
+       * DEL processing for the same redistributed route from any other
+       * source type.
+       */
+      for (i = 0; i < ZEBRA_ROUTE_MAX; i++)
+        {
+          if (i != api.type)
+            bgp_redistribute_delete((struct prefix *)&p, i, api.instance);
+        }
+
       bgp_redistribute_add ((struct prefix *)&p, NULL, &nexthop, ifindex,
 			    api.metric, api.type, api.instance, api.tag);
     }
