@@ -24,4 +24,6 @@
 
 int vtysh_auth ();
 
+char *vtysh_get_home (void);
+
 #endif /* _VTYSH_USER_H */
