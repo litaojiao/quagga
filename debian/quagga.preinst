@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# HACKY MC HACKERSON Warning
+# These following lines are an attempt to
+# make jdoo stop being so jdoo'ish
+# This code change must *never* see the light
+# of day outside of the 2.5.X series.
+# Unless you are a meanie
+/usr/bin/jdoo unmonitor watchquagga
+rm /etc/jdoo/cumulus.d/watchquagga.rc
+service quagga stop
+
 if [ -n "$DEBIAN_SCRIPT_DEBUG" ]; then set -v -x; DEBIAN_SCRIPT_TRACE=1; fi
 ${DEBIAN_SCRIPT_TRACE:+ echo "#42#DEBUG# RUNNING $0 $*"}
 set -e
