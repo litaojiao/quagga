@@ -357,6 +357,12 @@ struct zebra_vrf
    * Back pointer to the owning namespace.
    */
   struct zebra_ns *zns;
+
+  /* MPLS static LSP config table */
+  struct hash *slsp_table;
+
+  /* MPLS label forwarding table */
+  struct hash *lsp_table;
 };
 
 extern struct zebra_ns *dzns;
