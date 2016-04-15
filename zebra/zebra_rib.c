@@ -46,6 +46,7 @@
 #include "zebra/zebra_rnh.h"
 #include "zebra/interface.h"
 #include "zebra/connected.h"
+#include "zebra/zebra_mpls.h"
 
 /* Default rtm_table for all clients */
 extern struct zebra_t zebrad;
@@ -3885,6 +3886,8 @@ zebra_vrf_alloc (vrf_id_t vrf_id, const char *name)
       strncpy (zvrf->name, name, strlen(name));
       zvrf->name[strlen(name)] = '\0';
     }
+
+  zebra_mpls_init_tables (zvrf);
 
   return zvrf;
 }
