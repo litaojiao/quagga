@@ -29,6 +29,7 @@
 #include "queue.h"
 #include "nexthop.h"
 #include "vrf.h"
+#include "mpls.h"
 
 #define DISTANCE_INFINITY  255
 #define ZEBRA_KERNEL_TABLE_MAX 252 /* support for no more than this rt tables */
@@ -521,6 +522,8 @@ static_delete_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
 
 extern int rib_gc_dest (struct route_node *rn);
 extern struct route_table *rib_tables_iter_next (rib_tables_iter_t *iter);
+
+extern u_char route_distance(int type);
 
 /*
  * Inline functions.

@@ -81,6 +81,9 @@ struct nexthop
    * obtained by recursive resolution will be added to `resolved'.
    * Only one level of recursive resolution is currently supported. */
   struct nexthop *resolved;
+
+  /* Label(s) associated with this nexthop. */
+  struct nexthop_label *nh_label;
 };
 
 extern int zebra_rnh_ip_default_route;
@@ -105,5 +108,8 @@ void nexthops_free (struct nexthop *nexthop);
 
 extern const char *nexthop_type_to_str (enum nexthop_types_t nh_type);
 extern int nexthop_same_no_recurse (struct nexthop *next1, struct nexthop *next2);
+
+void nexthop_add_labels (struct nexthop *, u_int8_t, mpls_label_t *);
+void nexthop_del_labels (struct nexthop *);
 
 #endif /*_LIB_NEXTHOP_H */

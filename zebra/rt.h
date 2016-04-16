@@ -26,6 +26,7 @@
 #include "prefix.h"
 #include "if.h"
 #include "zebra/rib.h"
+#include "zebra/zebra_mpls.h"
 
 extern int kernel_add_ipv4 (struct prefix *, struct rib *);
 extern int kernel_update_ipv4 (struct prefix *, struct rib *);
@@ -42,5 +43,9 @@ extern int kernel_delete_ipv6_old (struct prefix_ipv6 *dest, struct in6_addr *ga
 			    	  unsigned int index, int flags, int table);
 
 #endif /* HAVE_IPV6 */
+
+extern int kernel_add_lsp (zebra_lsp_t *);
+extern int kernel_upd_lsp (zebra_lsp_t *);
+extern int kernel_del_lsp (zebra_lsp_t *);
 
 #endif /* _ZEBRA_RT_H */

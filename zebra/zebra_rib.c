@@ -36,6 +36,7 @@
 #include "routemap.h"
 #include "nexthop.h"
 #include "vrf.h"
+#include "mpls.h"
 
 #include "zebra/rib.h"
 #include "zebra/rt.h"
@@ -79,6 +80,19 @@ static const struct
   [ZEBRA_ROUTE_BGP]     = {ZEBRA_ROUTE_BGP,      20  /* IBGP is 200. */},
   /* no entry/default: 150 */
 };
+
+u_char
+route_distance (int type)
+{
+  u_char distance;
+
+  if ((unsigned)type >= array_size(route_info))
+    distance = 150;
+  else
+    distance = route_info[type].distance;
+
+  return distance;
+}
 
 int
 is_zebra_valid_kernel_table(u_int32_t table_id)
@@ -3717,6 +3731,9 @@ rib_close (void)
       if (zvrf->other_table[AFI_IP6][table_id])
         rib_close_table (zvrf->other_table[AFI_IP6][table_id]);
     }
+
+  zebra_mpls_close_tables(zvrf);
+
 }
 
 /* Routing information base initialize. */
