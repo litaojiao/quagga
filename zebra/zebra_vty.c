@@ -44,7 +44,8 @@ static int
 zebra_static_ipv4 (struct vty *vty, int add_cmd, const char *dest_str,
 		   const char *mask_str, const char *gate_str,
 		   const char *flag_str, const char *tag_str,
-		   const char *distance_str, const char *vrf_id_str)
+		   const char *distance_str, const char *vrf_id_str,
+		   const char *label_str)
 {
   int ret;
   u_char distance;
@@ -55,7 +56,9 @@ zebra_static_ipv4 (struct vty *vty, int add_cmd, const char *dest_str,
   u_short tag = 0;
   vrf_id_t vrf_id = VRF_DEFAULT;
   unsigned int ifindex = 0;
-
+  struct static_nh_label snh_label;
+   
+  memset (&snh_label, 0, sizeof (struct static_nh_label));
   ret = str2prefix (dest_str, &p);
   if (ret <= 0)
     {
@@ -92,6 +95,17 @@ zebra_static_ipv4 (struct vty *vty, int add_cmd, const char *dest_str,
   if (vrf_id_str)
     VRF_GET_ID (vrf_id, vrf_id_str); //Pending: create VRF if the given vrf doesnt exist?
 
+  /* Labels */
+  if (label_str)
+    {
+      if (mpls_str2label (label_str, &snh_label.num_labels,
+                          snh_label.label))
+        {
+          vty_out (vty, "%% Malformed label(s)%s", VTY_NEWLINE);
+          return CMD_WARNING;
+        }
+    }
+
   /* Null0 static route.  */
   if ((gate_str != NULL) && (strncasecmp (gate_str, "Null0", strlen (gate_str)) == 0))
     {
@@ -101,9 +115,10 @@ zebra_static_ipv4 (struct vty *vty, int add_cmd, const char *dest_str,
           return CMD_WARNING;
         }
       if (add_cmd)
-        static_add_ipv4 (&p, NULL, ifindex, ZEBRA_FLAG_BLACKHOLE, tag, distance, vrf_id);
+        static_add_ipv4 (&p, NULL, ifindex, ZEBRA_FLAG_BLACKHOLE, tag, distance,
+                         vrf_id, &snh_label);
       else
-        static_delete_ipv4 (&p, NULL, ifindex, tag, distance, vrf_id);
+        static_delete_ipv4 (&p, NULL, ifindex, tag, distance, vrf_id, &snh_label);
       return CMD_SUCCESS;
     }
 
@@ -127,9 +142,9 @@ zebra_static_ipv4 (struct vty *vty, int add_cmd, const char *dest_str,
   if (gate_str == NULL)
   {
     if (add_cmd)
-      static_add_ipv4 (&p, NULL, ifindex, flag, tag, distance, vrf_id);
+      static_add_ipv4 (&p, NULL, ifindex, flag, tag, distance, vrf_id, &snh_label);
     else
-      static_delete_ipv4 (&p, NULL, ifindex, tag, distance, vrf_id);
+      static_delete_ipv4 (&p, NULL, ifindex, tag, distance, vrf_id, &snh_label);
 
     return CMD_SUCCESS;
   }
@@ -149,9 +164,11 @@ zebra_static_ipv4 (struct vty *vty, int add_cmd, const char *dest_str,
     }
 
   if (add_cmd)
-    static_add_ipv4 (&p, ifindex ? NULL : &gate, ifindex, flag, tag, distance, vrf_id);
+    static_add_ipv4 (&p, ifindex ? NULL : &gate, ifindex, flag, tag,
+                     distance, vrf_id, &snh_label);
   else
-    static_delete_ipv4 (&p, ifindex ? NULL : &gate, ifindex, tag, distance, vrf_id);
+    static_delete_ipv4 (&p, ifindex ? NULL : &gate, ifindex, tag,
+                        distance, vrf_id, &snh_label);
 
   return CMD_SUCCESS;
 }
@@ -159,21 +176,23 @@ zebra_static_ipv4 (struct vty *vty, int add_cmd, const char *dest_str,
 /* Static route configuration.  */
 DEFUN (ip_route, 
        ip_route_cmd,
-       "ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0)",
+       "ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) {label WORD}",
        IP_STR
        "Establish static routes\n"
        "IP destination prefix (e.g. 10.0.0.0/8)\n"
        "IP gateway address\n"
        "IP gateway interface name\n"
-       "Null interface\n")
+       "Null interface\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], NULL, NULL,
-                            NULL, NULL);
+                            NULL, NULL, argv[2]);
 }
 
 DEFUN (ip_route_tag,
        ip_route_tag_cmd,
-       "ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) tag <1-65535>",
+       "ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) tag <1-65535> {label WORD}",
        IP_STR
        "Establish static routes\n"
        "IP destination prefix (e.g. 10.0.0.0/8)\n"
@@ -181,30 +200,34 @@ DEFUN (ip_route_tag,
        "IP gateway interface name\n"
        "Null interface\n"
        "Set tag for this route\n"
-       "Tag value\n")
+       "Tag value\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], NULL, argv[2],
-                            NULL, NULL);
+                            NULL, NULL, argv[3]);
 }
 
 DEFUN (ip_route_flags,
        ip_route_flags_cmd,
-       "ip route A.B.C.D/M (A.B.C.D|INTERFACE) (reject|blackhole)",
+       "ip route A.B.C.D/M (A.B.C.D|INTERFACE) (reject|blackhole) {label WORD}",
        IP_STR
        "Establish static routes\n"
        "IP destination prefix (e.g. 10.0.0.0/8)\n"
        "IP gateway address\n"
        "IP gateway interface name\n"
        "Emit an ICMP unreachable when matched\n"
-       "Silently discard pkts when matched\n")
+       "Silently discard pkts when matched\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], argv[2], NULL,
-                            NULL, NULL);
+                            NULL, NULL, NULL);
 }
 
 DEFUN (ip_route_flags_tag,
        ip_route_flags_tag_cmd,
-       "ip route A.B.C.D/M (A.B.C.D|INTERFACE) (reject|blackhole) tag <1-65535>",
+       "ip route A.B.C.D/M (A.B.C.D|INTERFACE) (reject|blackhole) tag <1-65535> {label WORD}",
        IP_STR
        "Establish static routes\n"
        "IP destination prefix (e.g. 10.0.0.0/8)\n"
@@ -213,11 +236,13 @@ DEFUN (ip_route_flags_tag,
        "Emit an ICMP unreachable when matched\n"
        "Silently discard pkts when matched\n"
        "Set tag for this route\n"
-       "Tag value\n")
+       "Tag value\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 
 {
   return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], argv[2], argv[3],
-                            NULL, NULL);
+                            NULL, NULL, argv[4]);
 }
 
 DEFUN (ip_route_flags2,
@@ -230,7 +255,7 @@ DEFUN (ip_route_flags2,
        "Silently discard pkts when matched\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], NULL, NULL, argv[1], NULL,
-                            NULL, NULL);
+                            NULL, NULL, NULL);
 }
 
 DEFUN (ip_route_flags2_tag,
@@ -246,28 +271,30 @@ DEFUN (ip_route_flags2_tag,
 
 {
   return zebra_static_ipv4 (vty, 1, argv[0], NULL, NULL, argv[1], argv[2],
-                            NULL, NULL);
+                            NULL, NULL, NULL);
 }
 
 /* Mask as A.B.C.D format.  */
 DEFUN (ip_route_mask,
        ip_route_mask_cmd,
-       "ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0)",
+       "ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) {label WORD}",
        IP_STR
        "Establish static routes\n"
        "IP destination prefix\n"
        "IP destination prefix mask\n"
        "IP gateway address\n"
        "IP gateway interface name\n"
-       "Null interface\n")
+       "Null interface\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], NULL, NULL,
-                            NULL, NULL);
+                            NULL, NULL, argv[3]);
 }
 
 DEFUN (ip_route_mask_tag,
        ip_route_mask_tag_cmd,
-       "ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) tag <1-65535>",
+       "ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) tag <1-65535> {label WORD}",
        IP_STR
        "Establish static routes\n"
        "IP destination prefix\n"
@@ -276,11 +303,13 @@ DEFUN (ip_route_mask_tag,
        "IP gateway interface name\n"
        "Null interface\n"
        "Set tag for this route\n"
-       "Tag value\n")
+       "Tag value\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 
 {
   return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], NULL, argv[3],
-                            NULL, NULL);
+                            NULL, NULL, argv[4]);
 }
 
 DEFUN (ip_route_mask_flags,
@@ -296,7 +325,7 @@ DEFUN (ip_route_mask_flags,
        "Silently discard pkts when matched\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], argv[3], NULL,
-                            NULL, NULL);
+                            NULL, NULL, NULL);
 }
 
 DEFUN (ip_route_mask_flags_tag,
@@ -315,7 +344,7 @@ DEFUN (ip_route_mask_flags_tag,
 
 {
   return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], argv[3], argv[4],
-                            NULL, NULL);
+                            NULL, NULL, NULL);
 }
 
 DEFUN (ip_route_mask_flags2,
@@ -329,7 +358,7 @@ DEFUN (ip_route_mask_flags2,
        "Silently discard pkts when matched\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], argv[1], NULL, argv[2], NULL,
-                            NULL, NULL);
+                            NULL, NULL, NULL);
 }
 
 DEFUN (ip_route_mask_flags2_tag,
@@ -345,28 +374,30 @@ DEFUN (ip_route_mask_flags2_tag,
        "Tag value\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], argv[1], NULL, argv[2], argv[3],
-                            NULL, NULL);
+                            NULL, NULL, NULL);
 }
 
 /* Distance option value.  */
 DEFUN (ip_route_distance,
        ip_route_distance_cmd,
-       "ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) <1-255>",
+       "ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) <1-255> {label WORD}",
        IP_STR
        "Establish static routes\n"
        "IP destination prefix (e.g. 10.0.0.0/8)\n"
        "IP gateway address\n"
        "IP gateway interface name\n"
        "Null interface\n"
-       "Distance value for this route\n")
+       "Distance value for this route\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], NULL, NULL,
-                            argv[2], NULL);
+                            argv[2], NULL, argv[3]);
 }
 
 DEFUN (ip_route_tag_distance,
        ip_route_tag_distance_cmd,
-       "ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) tag <1-65535> <1-255>",
+       "ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) tag <1-65535> <1-255> {label WORD}",
        IP_STR
        "Establish static routes\n"
        "IP destination prefix (e.g. 10.0.0.0/8)\n"
@@ -375,11 +406,13 @@ DEFUN (ip_route_tag_distance,
        "Null interface\n"
        "Set tag for this route\n"
        "Tag value\n"
-       "Distance value for this route\n")
+       "Distance value for this route\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 
 {
   return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], NULL, argv[2],
-                            argv[3], NULL);
+                            argv[3], NULL, argv[4]);
 }
 
 DEFUN (ip_route_flags_distance,
@@ -395,7 +428,7 @@ DEFUN (ip_route_flags_distance,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], argv[2], NULL,
-                            argv[3], NULL);
+                            argv[3], NULL, NULL);
 }
 
 DEFUN (ip_route_flags_tag_distance,
@@ -413,7 +446,7 @@ DEFUN (ip_route_flags_tag_distance,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], argv[2], argv[3],
-                            argv[4], NULL);
+                            argv[4], NULL, NULL);
 }
 
 DEFUN (ip_route_flags_distance2,
@@ -427,7 +460,7 @@ DEFUN (ip_route_flags_distance2,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], NULL, NULL, argv[1], NULL,
-                            argv[2], NULL);
+                            argv[2], NULL, NULL);
 }
 
 DEFUN (ip_route_flags_tag_distance2,
@@ -443,12 +476,12 @@ DEFUN (ip_route_flags_tag_distance2,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], NULL, NULL, argv[1], argv[2],
-                            argv[3], NULL);
+                            argv[3], NULL, NULL);
 }
 
 DEFUN (ip_route_mask_distance,
        ip_route_mask_distance_cmd,
-       "ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) <1-255>",
+       "ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) <1-255> {label WORD}",
        IP_STR
        "Establish static routes\n"
        "IP destination prefix\n"
@@ -456,15 +489,17 @@ DEFUN (ip_route_mask_distance,
        "IP gateway address\n"
        "IP gateway interface name\n"
        "Null interface\n"
-       "Distance value for this route\n")
+       "Distance value for this route\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], NULL, NULL,
-                            argv[3], NULL);
+                            argv[3], NULL, argv[4]);
 }
 
 DEFUN (ip_route_mask_tag_distance,
        ip_route_mask_tag_distance_cmd,
-       "ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) tag <1-65535> <1-255>",
+       "ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) tag <1-65535> <1-255> {label WORD}",
        IP_STR
        "Establish static routes\n"
        "IP destination prefix\n"
@@ -474,10 +509,12 @@ DEFUN (ip_route_mask_tag_distance,
        "Null interface\n"
        "Set tag for this route\n"
        "Tag value\n"
-       "Distance value for this route\n")
+       "Distance value for this route\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], NULL, argv[3],
-                            argv[4], NULL);
+                            argv[4], NULL, argv[5]);
 }
 
 DEFUN (ip_route_mask_flags_tag_distance,
@@ -496,7 +533,7 @@ DEFUN (ip_route_mask_flags_tag_distance,
        "Silently discard pkts when matched\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], argv[3], argv[4],
-                            argv[5], NULL);
+                            argv[5], NULL, NULL);
 }
 
 
@@ -514,7 +551,7 @@ DEFUN (ip_route_mask_flags_distance,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], argv[3], NULL,
-                            argv[4], NULL);
+                            argv[4], NULL, NULL);
 }
 
 DEFUN (ip_route_mask_flags_distance2,
@@ -529,7 +566,7 @@ DEFUN (ip_route_mask_flags_distance2,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], argv[1], NULL, argv[2], NULL,
-                            argv[3], NULL);
+                            argv[3], NULL, NULL);
 }
 
 DEFUN (ip_route_mask_flags_tag_distance2,
@@ -546,27 +583,29 @@ DEFUN (ip_route_mask_flags_tag_distance2,
        "Silently discard pkts when matched\n")
 {
   return zebra_static_ipv4 (vty, 1, argv[0], argv[1], NULL, argv[2], argv[3],
-                            argv[4], NULL);
+                            argv[4], NULL, NULL);
 }
 
 DEFUN (no_ip_route, 
        no_ip_route_cmd,
-       "no ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0)",
+       "no ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) {label WORD}",
        NO_STR
        IP_STR
        "Establish static routes\n"
        "IP destination prefix (e.g. 10.0.0.0/8)\n"
        "IP gateway address\n"
        "IP gateway interface name\n"
-       "Null interface\n")
+       "Null interface\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], NULL, NULL,
-                            NULL, NULL);
+                            NULL, NULL, argv[2]);
 }
 
 DEFUN (no_ip_route_tag,
        no_ip_route_tag_cmd,
-       "no ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) tag <1-65535>",
+       "no ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) tag <1-65535> {label WORD}",
        NO_STR
        IP_STR
        "Establish static routes\n"
@@ -575,10 +614,12 @@ DEFUN (no_ip_route_tag,
        "IP gateway interface name\n"
        "Null interface\n"
        "Tag of this route\n"
-       "Tag value\n")
+       "Tag value\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], NULL, argv[2],
-                            NULL, NULL);
+                            NULL, NULL, argv[3]);
 }
 
 ALIAS (no_ip_route,
@@ -618,7 +659,7 @@ DEFUN (no_ip_route_flags2,
        "Silently discard pkts when matched\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], NULL, NULL, NULL, NULL,
-                            NULL, NULL);
+                            NULL, NULL, NULL);
 }
 
 DEFUN (no_ip_route_flags2_tag,
@@ -634,12 +675,12 @@ DEFUN (no_ip_route_flags2_tag,
        "Tag value\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], NULL, NULL, NULL, argv[1],
-                            NULL, NULL);
+                            NULL, NULL, NULL);
 }
 
 DEFUN (no_ip_route_mask,
        no_ip_route_mask_cmd,
-       "no ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0)",
+       "no ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) {label WORD}",
        NO_STR
        IP_STR
        "Establish static routes\n"
@@ -647,15 +688,17 @@ DEFUN (no_ip_route_mask,
        "IP destination prefix mask\n"
        "IP gateway address\n"
        "IP gateway interface name\n"
-       "Null interface\n")
+       "Null interface\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], NULL, NULL,
-                            NULL, NULL);
+                            NULL, NULL, argv[3]);
 }
 
 DEFUN (no_ip_route_mask_tag,
        no_ip_route_mask_tag_cmd,
-       "no ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) tag <1-65535>",
+       "no ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) tag <1-65535> {label WORD}",
        NO_STR
        IP_STR
        "Establish static routes\n"
@@ -665,10 +708,12 @@ DEFUN (no_ip_route_mask_tag,
        "IP gateway interface name\n"
        "Null interface\n"
        "Tag of this route\n"
-       "Tag value\n")
+       "Tag value\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], NULL, argv[3],
-                            NULL, NULL);
+                            NULL, NULL, argv[4]);
 }
 
 ALIAS (no_ip_route_mask,
@@ -711,7 +756,7 @@ DEFUN (no_ip_route_mask_flags2,
        "Silently discard pkts when matched\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], argv[1], NULL, NULL, NULL,
-                            NULL, NULL);
+                            NULL, NULL, NULL);
 }
 
 DEFUN (no_ip_route_mask_flags2_tag,
@@ -728,12 +773,12 @@ DEFUN (no_ip_route_mask_flags2_tag,
        "Tag value\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], argv[1], NULL, NULL, argv[2],
-                            NULL, NULL);
+                            NULL, NULL, NULL);
 }
 
 DEFUN (no_ip_route_distance,
        no_ip_route_distance_cmd,
-       "no ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) <1-255>",
+       "no ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) <1-255> {label WORD}",
        NO_STR
        IP_STR
        "Establish static routes\n"
@@ -741,15 +786,17 @@ DEFUN (no_ip_route_distance,
        "IP gateway address\n"
        "IP gateway interface name\n"
        "Null interface\n"
-       "Distance value for this route\n")
+       "Distance value for this route\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], NULL, NULL,
-                            argv[2], NULL);
+                            argv[2], NULL, argv[3]);
 }
 
 DEFUN (no_ip_route_tag_distance,
        no_ip_route_tag_distance_cmd,
-       "no ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) tag <1-65535> <1-255>",
+       "no ip route A.B.C.D/M (A.B.C.D|INTERFACE|null0) tag <1-65535> <1-255> {label WORD}",
        NO_STR
        IP_STR
        "Establish static routes\n"
@@ -759,10 +806,12 @@ DEFUN (no_ip_route_tag_distance,
        "Null interface\n"
        "Tag of this route\n"
        "Tag value\n"
-       "Distance value for this route\n")
+       "Distance value for this route\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], NULL, argv[2],
-                            argv[3], NULL);
+                            argv[3], NULL, argv[4]);
 }
 
 DEFUN (no_ip_route_flags_distance,
@@ -779,7 +828,7 @@ DEFUN (no_ip_route_flags_distance,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], argv[2], NULL,
-                            argv[3], NULL);
+                            argv[3], NULL, NULL);
 }
 
 DEFUN (no_ip_route_flags_tag_distance,
@@ -798,7 +847,7 @@ DEFUN (no_ip_route_flags_tag_distance,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], argv[2], argv[3],
-                            argv[4], NULL);
+                            argv[4], NULL, NULL);
 }
 
 DEFUN (no_ip_route_flags_distance2,
@@ -813,12 +862,12 @@ DEFUN (no_ip_route_flags_distance2,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], NULL, NULL, argv[1], NULL,
-                            argv[2], NULL);
+                            argv[2], NULL, NULL);
 }
 
 DEFUN (no_ip_route_flags_tag_distance2,
        no_ip_route_flags_tag_distance2_cmd,
-       "no ip route A.B.C.D/M (reject|blackhole) tag <1-65535> <1-255>",
+       "no ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) <1-255> {label WORD}",
        NO_STR
        IP_STR
        "Establish static routes\n"
@@ -827,15 +876,17 @@ DEFUN (no_ip_route_flags_tag_distance2,
        "Silently discard pkts when matched\n"
        "Tag of this route\n"
        "Tag value\n"
-       "Distance value for this route\n")
+       "Distance value for this route\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], NULL, NULL, argv[1], argv[2],
-                            argv[3], NULL);
+                            argv[3], NULL, argv[4]);
 }
 
 DEFUN (no_ip_route_mask_distance,
        no_ip_route_mask_distance_cmd,
-       "no ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) <1-255>",
+       "no ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) tag <1-65535> <1-255> {label WORD}",
        NO_STR
        IP_STR
        "Establish static routes\n"
@@ -844,15 +895,17 @@ DEFUN (no_ip_route_mask_distance,
        "IP gateway address\n"
        "IP gateway interface name\n"
        "Null interface\n"
-       "Distance value for this route\n")
+       "Distance value for this route\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], NULL, NULL,
-                            argv[3], NULL);
+                            argv[3], NULL, argv[5]);
 }
 
 DEFUN (no_ip_route_mask_tag_distance,
        no_ip_route_mask_tag_distance_cmd,
-       "no ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) tag <1-65535> <1-255>",
+       "no ip route A.B.C.D A.B.C.D (A.B.C.D|INTERFACE|null0) tag <1-65535> <1-255> {label WORD}",
        NO_STR
        IP_STR
        "Establish static routes\n"
@@ -863,10 +916,12 @@ DEFUN (no_ip_route_mask_tag_distance,
        "Null interface\n"
        "Tag of this route\n"
        "Tag value\n"
-       "Distance value for this route\n")
+       "Distance value for this route\n"
+       "Specify label(s) for this route\n"
+       "One or more labels separated by '/'\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], NULL, argv[3],
-                            argv[4], NULL);
+                            argv[4], NULL, argv[5]);
 }
 
 DEFUN (no_ip_route_mask_flags_distance,
@@ -884,7 +939,7 @@ DEFUN (no_ip_route_mask_flags_distance,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], argv[3], NULL,
-                            argv[4], NULL);
+                            argv[4], NULL, NULL);
 }
 
 DEFUN (no_ip_route_mask_flags_tag_distance,
@@ -904,7 +959,7 @@ DEFUN (no_ip_route_mask_flags_tag_distance,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], argv[3], argv[4],
-                            argv[5], NULL);
+                            argv[5], NULL, NULL);
 }
 
 DEFUN (no_ip_route_mask_flags_distance2,
@@ -920,7 +975,7 @@ DEFUN (no_ip_route_mask_flags_distance2,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], argv[1], NULL, argv[2], NULL,
-                            argv[3], NULL);
+                            argv[3], NULL, NULL);
 }
 
 DEFUN (no_ip_route_mask_flags_tag_distance2,
@@ -938,7 +993,7 @@ DEFUN (no_ip_route_mask_flags_tag_distance2,
        "Distance value for this route\n")
 {
   return zebra_static_ipv4 (vty, 0, argv[0], argv[1], NULL, argv[2], argv[3],
-                            argv[4], NULL);
+                            argv[4], NULL, NULL);
 }
 
 /* Static route configuration.  */
@@ -953,7 +1008,7 @@ DEFUN (ip_route_vrf,
        "Null interface\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], NULL, NULL, NULL, argv[2]);
+  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], NULL, NULL, NULL, argv[2], NULL);
 }
 
 DEFUN (ip_route_tag_vrf,
@@ -969,7 +1024,7 @@ DEFUN (ip_route_tag_vrf,
        "Tag value\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], NULL, argv[2], NULL, argv[3]);
+  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], NULL, argv[2], NULL, argv[3], NULL);
 }
 
 DEFUN (ip_route_flags_vrf,
@@ -984,7 +1039,7 @@ DEFUN (ip_route_flags_vrf,
        "Silently discard pkts when matched\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], argv[2], NULL, NULL, argv[3]);
+  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], argv[2], NULL, NULL, argv[3], NULL);
 }
 
 DEFUN (ip_route_flags_tag_vrf,
@@ -1002,7 +1057,7 @@ DEFUN (ip_route_flags_tag_vrf,
        VRF_CMD_HELP_STR)
 
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], argv[2], argv[3], NULL, argv[4]);
+  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], argv[2], argv[3], NULL, argv[4], NULL);
 }
 
 DEFUN (ip_route_flags2_vrf,
@@ -1015,7 +1070,7 @@ DEFUN (ip_route_flags2_vrf,
        "Silently discard pkts when matched\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], NULL, NULL, argv[1], NULL, NULL, argv[2]);
+  return zebra_static_ipv4 (vty, 1, argv[0], NULL, NULL, argv[1], NULL, NULL, argv[2], NULL);
 }
 
 DEFUN (ip_route_flags2_tag_vrf,
@@ -1031,7 +1086,7 @@ DEFUN (ip_route_flags2_tag_vrf,
        VRF_CMD_HELP_STR)
 
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], NULL, NULL, argv[1], argv[2], NULL, argv[3]);
+  return zebra_static_ipv4 (vty, 1, argv[0], NULL, NULL, argv[1], argv[2], NULL, argv[3], NULL);
 }
 
 /* Mask as A.B.C.D format.  */
@@ -1047,7 +1102,7 @@ DEFUN (ip_route_mask_vrf,
        "Null interface\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], NULL, NULL, NULL, argv[3]);
+  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], NULL, NULL, NULL, argv[3], NULL);
 }
 
 DEFUN (ip_route_mask_tag_vrf,
@@ -1065,7 +1120,7 @@ DEFUN (ip_route_mask_tag_vrf,
        VRF_CMD_HELP_STR)
 
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], NULL, argv[3], NULL, argv[4]);
+  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], NULL, argv[3], NULL, argv[4], NULL);
 }
 
 DEFUN (ip_route_mask_flags_vrf,
@@ -1081,7 +1136,7 @@ DEFUN (ip_route_mask_flags_vrf,
        "Silently discard pkts when matched\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], argv[3], NULL, NULL, argv[4]);
+  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], argv[3], NULL, NULL, argv[4], NULL);
 }
 
 DEFUN (ip_route_mask_flags_tag_vrf,
@@ -1100,7 +1155,7 @@ DEFUN (ip_route_mask_flags_tag_vrf,
        VRF_CMD_HELP_STR)
 
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], argv[3], argv[4], NULL, argv[5]);
+  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], argv[3], argv[4], NULL, argv[5], NULL);
 }
 
 DEFUN (ip_route_mask_flags2_vrf,
@@ -1114,7 +1169,7 @@ DEFUN (ip_route_mask_flags2_vrf,
        "Silently discard pkts when matched\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], NULL, argv[2], NULL, NULL, argv[3]);
+  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], NULL, argv[2], NULL, NULL, argv[3], NULL);
 }
 
 DEFUN (ip_route_mask_flags2_tag_vrf,
@@ -1130,7 +1185,7 @@ DEFUN (ip_route_mask_flags2_tag_vrf,
        "Tag value\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], NULL, argv[2], argv[3], NULL, argv[4]);
+  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], NULL, argv[2], argv[3], NULL, argv[4], NULL);
 }
 
 /* Distance option value.  */
@@ -1146,7 +1201,7 @@ DEFUN (ip_route_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], NULL, NULL, argv[2], argv[3]);
+  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], NULL, NULL, argv[2], argv[3], NULL);
 }
 
 DEFUN (ip_route_tag_distance_vrf,
@@ -1164,7 +1219,7 @@ DEFUN (ip_route_tag_distance_vrf,
        VRF_CMD_HELP_STR)
 
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], NULL, argv[2], argv[3], argv[4]);
+  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], NULL, argv[2], argv[3], argv[4], NULL);
 }
 
 DEFUN (ip_route_flags_distance_vrf,
@@ -1180,7 +1235,7 @@ DEFUN (ip_route_flags_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], argv[2], NULL, argv[3], argv[4]);
+  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], argv[2], NULL, argv[3], argv[4], NULL);
 }
 
 DEFUN (ip_route_flags_tag_distance_vrf,
@@ -1198,7 +1253,7 @@ DEFUN (ip_route_flags_tag_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], argv[2], argv[3], argv[4],argv[5]);
+  return zebra_static_ipv4 (vty, 1, argv[0], NULL, argv[1], argv[2], argv[3], argv[4],argv[5], NULL);
 }
 
 DEFUN (ip_route_flags_distance2_vrf,
@@ -1212,7 +1267,7 @@ DEFUN (ip_route_flags_distance2_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], NULL, NULL, argv[1], NULL, argv[2], argv[3]);
+  return zebra_static_ipv4 (vty, 1, argv[0], NULL, NULL, argv[1], NULL, argv[2], argv[3], NULL);
 }
 
 DEFUN (ip_route_flags_tag_distance2_vrf,
@@ -1228,7 +1283,7 @@ DEFUN (ip_route_flags_tag_distance2_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], NULL, NULL, argv[1], argv[2], argv[3], argv[4]);
+  return zebra_static_ipv4 (vty, 1, argv[0], NULL, NULL, argv[1], argv[2], argv[3], argv[4], NULL);
 }
 
 DEFUN (ip_route_mask_distance_vrf,
@@ -1244,7 +1299,7 @@ DEFUN (ip_route_mask_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], NULL, NULL, argv[3], argv[4]);
+  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], NULL, NULL, argv[3], argv[4], NULL);
 }
 
 DEFUN (ip_route_mask_tag_distance_vrf,
@@ -1262,7 +1317,7 @@ DEFUN (ip_route_mask_tag_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], NULL, argv[3], argv[4], argv[5]);
+  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], NULL, argv[3], argv[4], argv[5], NULL);
 }
 
 DEFUN (ip_route_mask_flags_tag_distance_vrf,
@@ -1281,7 +1336,7 @@ DEFUN (ip_route_mask_flags_tag_distance_vrf,
        "Silently discard pkts when matched\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], argv[6]);
+  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], argv[6], NULL);
 }
 
 
@@ -1299,7 +1354,7 @@ DEFUN (ip_route_mask_flags_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], argv[3], NULL, argv[4], argv[5]);
+  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], argv[2], argv[3], NULL, argv[4], argv[5], NULL);
 }
 
 DEFUN (ip_route_mask_flags_distance2_vrf,
@@ -1314,7 +1369,7 @@ DEFUN (ip_route_mask_flags_distance2_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], NULL, argv[2], NULL, argv[3], argv[4]);
+  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], NULL, argv[2], NULL, argv[3], argv[4], NULL);
 }
 
 DEFUN (ip_route_mask_flags_tag_distance2_vrf,
@@ -1331,7 +1386,7 @@ DEFUN (ip_route_mask_flags_tag_distance2_vrf,
        "Silently discard pkts when matched\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], NULL, argv[2], argv[3], argv[4], argv[5]);
+  return zebra_static_ipv4 (vty, 1, argv[0], argv[1], NULL, argv[2], argv[3], argv[4], argv[5], NULL);
 }
 
 DEFUN (no_ip_route_vrf, 
@@ -1346,7 +1401,7 @@ DEFUN (no_ip_route_vrf,
        "Null interface\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], NULL, NULL, NULL, argv[2]);
+  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], NULL, NULL, NULL, argv[2], NULL);
 }
 
 DEFUN (no_ip_route_flags_vrf,
@@ -1362,7 +1417,7 @@ DEFUN (no_ip_route_flags_vrf,
        "Silently discard pkts when matched\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], argv[2], NULL, NULL, argv[3]);
+  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], argv[2], NULL, NULL, argv[3], NULL);
 }
 
 DEFUN (no_ip_route_tag_vrf,
@@ -1379,7 +1434,7 @@ DEFUN (no_ip_route_tag_vrf,
        "Tag value\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], NULL, argv[2], NULL, argv[3]);
+  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], NULL, argv[2], NULL, argv[3], NULL);
 }
 
 DEFUN (no_ip_route_flags_tag_vrf,
@@ -1397,7 +1452,7 @@ DEFUN (no_ip_route_flags_tag_vrf,
        "Tag value\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], argv[2], argv[3], NULL, argv[4]);
+  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], argv[2], argv[3], NULL, argv[4], NULL);
 }
 
 DEFUN (no_ip_route_flags2_vrf,
@@ -1411,7 +1466,7 @@ DEFUN (no_ip_route_flags2_vrf,
        "Silently discard pkts when matched\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], NULL, NULL, argv[1], NULL, NULL, argv[2]);
+  return zebra_static_ipv4 (vty, 0, argv[0], NULL, NULL, argv[1], NULL, NULL, argv[2], NULL);
 }
 
 DEFUN (no_ip_route_flags2_tag_vrf,
@@ -1427,7 +1482,7 @@ DEFUN (no_ip_route_flags2_tag_vrf,
        "Tag value\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], NULL, NULL, argv[1], argv[2], NULL, argv[3]);
+  return zebra_static_ipv4 (vty, 0, argv[0], NULL, NULL, argv[1], argv[2], NULL, argv[3], NULL);
 }
 
 DEFUN (no_ip_route_mask_vrf,
@@ -1443,7 +1498,7 @@ DEFUN (no_ip_route_mask_vrf,
        "Null interface\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], NULL, NULL, NULL, argv[3]);
+  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], NULL, NULL, NULL, argv[3], NULL);
 }
 
 DEFUN (no_ip_route_mask_flags_vrf,
@@ -1460,7 +1515,7 @@ DEFUN (no_ip_route_mask_flags_vrf,
        "Silently discard pkts when matched\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], argv[3], NULL, NULL, argv[4]);
+  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], argv[3], NULL, NULL, argv[4], NULL);
 }
 
 DEFUN (no_ip_route_mask_tag_vrf,
@@ -1478,7 +1533,7 @@ DEFUN (no_ip_route_mask_tag_vrf,
        "Tag value\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], NULL, argv[3], NULL, argv[4]);
+  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], NULL, argv[3], NULL, argv[4], NULL);
 }
 
 DEFUN (no_ip_route_mask_flags_tag_vrf,
@@ -1497,7 +1552,7 @@ DEFUN (no_ip_route_mask_flags_tag_vrf,
        "Tag value\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], argv[3], argv[4], NULL, argv[5]);
+  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], argv[3], argv[4], NULL, argv[5], NULL);
 }
 
 DEFUN (no_ip_route_mask_flags2_vrf,
@@ -1512,7 +1567,7 @@ DEFUN (no_ip_route_mask_flags2_vrf,
        "Silently discard pkts when matched\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], NULL, argv[2], NULL, NULL, argv[3]);
+  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], NULL, argv[2], NULL, NULL, argv[3], NULL);
 }
 
 DEFUN (no_ip_route_mask_flags2_tag_vrf,
@@ -1529,7 +1584,7 @@ DEFUN (no_ip_route_mask_flags2_tag_vrf,
        "Tag value\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], NULL, argv[2], argv[3], NULL, argv[4]);
+  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], NULL, argv[2], argv[3], NULL, argv[4], NULL);
 }
 
 
@@ -1546,7 +1601,7 @@ DEFUN (no_ip_route_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], NULL, NULL, argv[2], argv[3]);
+  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], NULL, NULL, argv[2], argv[3], NULL);
 }
 
 DEFUN (no_ip_route_tag_distance_vrf,
@@ -1564,7 +1619,7 @@ DEFUN (no_ip_route_tag_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], NULL, argv[2], argv[3], argv[4]);
+  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], NULL, argv[2], argv[3], argv[4], NULL);
 }
 
 DEFUN (no_ip_route_flags_distance_vrf,
@@ -1581,7 +1636,7 @@ DEFUN (no_ip_route_flags_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], argv[2], NULL, argv[3], argv[4]);
+  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], argv[2], NULL, argv[3], argv[4], NULL);
 }
 
 DEFUN (no_ip_route_flags_tag_distance_vrf,
@@ -1600,7 +1655,7 @@ DEFUN (no_ip_route_flags_tag_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], argv[2], argv[3], argv[4],argv[5]);
+  return zebra_static_ipv4 (vty, 0, argv[0], NULL, argv[1], argv[2], argv[3], argv[4],argv[5], NULL);
 }
 
 DEFUN (no_ip_route_flags_distance2_vrf,
@@ -1615,7 +1670,7 @@ DEFUN (no_ip_route_flags_distance2_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], NULL, NULL, argv[1], NULL, argv[2], argv[3]);
+  return zebra_static_ipv4 (vty, 0, argv[0], NULL, NULL, argv[1], NULL, argv[2], argv[3], NULL);
 }
 
 DEFUN (no_ip_route_flags_tag_distance2_vrf,
@@ -1632,7 +1687,7 @@ DEFUN (no_ip_route_flags_tag_distance2_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], NULL, NULL, argv[1], argv[2] , argv[3], argv[4]);
+  return zebra_static_ipv4 (vty, 0, argv[0], NULL, NULL, argv[1], argv[2] , argv[3], argv[4], NULL);
 }
 
 DEFUN (no_ip_route_mask_distance_vrf,
@@ -1649,7 +1704,7 @@ DEFUN (no_ip_route_mask_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], NULL, NULL, argv[3], argv[4]);
+  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], NULL, NULL, argv[3], argv[4], NULL);
 }
 
 DEFUN (no_ip_route_mask_tag_distance_vrf,
@@ -1668,7 +1723,7 @@ DEFUN (no_ip_route_mask_tag_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], NULL, argv[3], argv[4], argv[5]);
+  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], NULL, argv[3], argv[4], argv[5], NULL);
 }
 
 DEFUN (no_ip_route_mask_flags_distance_vrf,
@@ -1686,7 +1741,7 @@ DEFUN (no_ip_route_mask_flags_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], argv[3], NULL, argv[4], argv[5]);
+  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], argv[3], NULL, argv[4], argv[5], NULL);
 }
 
 DEFUN (no_ip_route_mask_flags_tag_distance_vrf,
@@ -1706,7 +1761,7 @@ DEFUN (no_ip_route_mask_flags_tag_distance_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], argv[6]);
+  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], argv[6], NULL);
 }
 
 DEFUN (no_ip_route_mask_flags_distance2_vrf,
@@ -1722,7 +1777,7 @@ DEFUN (no_ip_route_mask_flags_distance2_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], NULL, argv[2], NULL, argv[3], argv[4]);
+  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], NULL, argv[2], NULL, argv[3], argv[4], NULL);
 }
 
 DEFUN (no_ip_route_mask_flags_tag_distance2_vrf,
@@ -1740,7 +1795,7 @@ DEFUN (no_ip_route_mask_flags_tag_distance2_vrf,
        "Distance value for this route\n"
        VRF_CMD_HELP_STR)
 {
-  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], NULL, argv[2], argv[3], argv[4], argv[5]);
+  return zebra_static_ipv4 (vty, 0, argv[0], argv[1], NULL, argv[2], argv[3], argv[4], argv[5], NULL);
 }
 
 static int
@@ -3353,6 +3408,7 @@ static_config_ipv4 (struct vty *vty, safi_t safi, const char *cmd)
   struct zebra_vrf *zvrf;
   vrf_iter_t iter;
   int write;
+  char buf[BUFSIZ];
 
   write = 0;
 
@@ -3404,6 +3460,12 @@ static_config_ipv4 (struct vty *vty, safi_t safi, const char *cmd)
                 vrf = vrf_lookup(si->vrf_id);
                 vty_out (vty, " vrf %s", vrf ? vrf->name : "");
               }
+
+            /* Label information */
+            if (si->snh_label.num_labels)
+              vty_out (vty, " label %s",
+                       mpls_label2str (si->snh_label.num_labels,
+                                       si->snh_label.label,  buf, BUFSIZ));
 
             vty_out (vty, "%s", VTY_NEWLINE);
 
@@ -3515,6 +3577,7 @@ static_ipv6_func (struct vty *vty, int add_cmd, const char *dest_str,
   u_short tag = 0;
   unsigned int ifindex = 0;
   struct interface *ifp = NULL;
+  struct static_nh_label snh_label;
   
   ret = str2prefix (dest_str, &p);
   if (ret <= 0)
@@ -3552,6 +3615,9 @@ static_ipv6_func (struct vty *vty, int add_cmd, const char *dest_str,
   /* tag */
   if (tag_str)
     tag = atoi(tag_str);
+
+  /* Labels -- not supported for IPv6 for now. */
+  memset (&snh_label, 0, sizeof (struct static_nh_label));
 
   /* When gateway is valid IPv6 addrees, then gate is treated as
      nexthop address other case gate is treated as interface name. */
@@ -3601,9 +3667,9 @@ static_ipv6_func (struct vty *vty, int add_cmd, const char *dest_str,
     }
 
   if (add_cmd)
-    static_add_ipv6 (&p, type, gate, ifindex, flag, tag, distance, vrf_id);
+    static_add_ipv6 (&p, type, gate, ifindex, flag, tag, distance, vrf_id, &snh_label);
   else
-    static_delete_ipv6 (&p, type, gate, ifindex, tag, distance, vrf_id);
+    static_delete_ipv6 (&p, type, gate, ifindex, tag, distance, vrf_id, &snh_label);
 
   return CMD_SUCCESS;
 }

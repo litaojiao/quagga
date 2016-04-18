@@ -170,6 +170,15 @@ typedef struct rib_dest_t_
 #define RNODE_FOREACH_RIB_SAFE(rn, rib, next)				\
   RIB_DEST_FOREACH_ROUTE_SAFE (rib_dest_from_rnode (rn), rib, next)
 
+
+/* Static route label information */
+struct static_nh_label
+{
+  u_int8_t num_labels;
+  u_int8_t reserved[3];
+  mpls_label_t label[2];
+};
+
 /* Static route information. */
 struct static_route
 {
@@ -211,6 +220,9 @@ struct static_route
  see ZEBRA_FLAG_REJECT
      ZEBRA_FLAG_BLACKHOLE
  */
+
+  /* Label information */
+  struct static_nh_label snh_label;
 };
 
 
@@ -488,11 +500,13 @@ extern void rib_queue_add (struct zebra_t *zebra, struct route_node *rn);
 
 extern int
 static_add_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
-                 u_char flags, u_short tag, u_char distance, vrf_id_t vrf_id);
+                 u_char flags, u_short tag, u_char distance, vrf_id_t vrf_id,
+                 struct static_nh_label *snh_label);
 
 extern int
 static_delete_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
-		    u_short tag, u_char distance, vrf_id_t vrf_id);
+		    u_short tag, u_char distance, vrf_id_t vrf_id,
+                    struct static_nh_label *snh_label);
 
 extern int
 rib_add_ipv6 (int type, u_short instance, int flags, struct prefix_ipv6 *p,
@@ -513,7 +527,8 @@ extern struct route_table *rib_table_ipv6;
 extern int
 static_add_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
 		 unsigned int ifindex, u_char flags, u_short tag,
-                 u_char distance, vrf_id_t vrf_id);
+                 u_char distance, vrf_id_t vrf_id,
+                 struct static_nh_label *snh_label);
 
 extern int
 rib_add_ipv6_multipath (struct prefix *, struct rib *, safi_t,
@@ -522,7 +537,7 @@ rib_add_ipv6_multipath (struct prefix *, struct rib *, safi_t,
 extern int
 static_delete_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
 		    unsigned int ifindex, u_short tag, u_char distance,
-                    vrf_id_t vrf_id);
+                    vrf_id_t vrf_id, struct static_nh_label *snh_label);
 
 extern int rib_gc_dest (struct route_node *rn);
 extern struct route_table *rib_tables_iter_next (rib_tables_iter_t *iter);
