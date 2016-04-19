@@ -31,6 +31,7 @@
 /* The default VRF ID */
 #define VRF_DEFAULT 0
 
+#if 0
 /* Pending: May need to refine this. */
 #ifndef IFLA_VRF_MAX
 enum {
@@ -40,6 +41,7 @@ enum {
 };
 
 #define IFLA_VRF_MAX (__IFLA_VRF_MAX - 1)
+#endif
 #endif
 
 #define VRF_NAMSIZ      36
