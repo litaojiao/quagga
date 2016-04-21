@@ -43,7 +43,9 @@
 #include "zebra/rtadv.h"
 #include "zebra/zebra_fpm.h"
 #include "zebra/zebra_ptm.h"
+#if defined(HAVE_MPLS)
 #include "zebra/zebra_mpls.h"
+#endif
 
 #define ZEBRA_PTM_SUPPORT
 
@@ -477,7 +479,9 @@ main (int argc, char **argv)
   zebra_ptm_init();
 #endif
 
+#if defined(HAVE_MPLS)
   zebra_mpls_init ();
+#endif
 
   /* For debug purpose. */
   /* SET_FLAG (zebra_debug_event, ZEBRA_DEBUG_EVENT); */

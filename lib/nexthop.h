@@ -25,7 +25,9 @@
 #define _LIB_NEXTHOP_H
 
 #include "prefix.h"
+#if defined(HAVE_MPLS)
 #include "mpls.h"
+#endif
 
 union g_addr {
   struct in_addr ipv4;
@@ -42,6 +44,7 @@ enum nexthop_types_t
   NEXTHOP_TYPE_BLACKHOLE,        /* Null0 nexthop.  */
 };
 
+#if defined(HAVE_MPLS)
 /* Nexthop label structure. */
 struct nexthop_label
 {
@@ -49,6 +52,7 @@ struct nexthop_label
   u_int8_t reserved[3];
   mpls_label_t label[0]; /* 1 or more labels. */
 };
+#endif
 
 /* Nexthop structure. */
 struct nexthop
@@ -82,8 +86,10 @@ struct nexthop
    * Only one level of recursive resolution is currently supported. */
   struct nexthop *resolved;
 
+#if defined(HAVE_MPLS)
   /* Label(s) associated with this nexthop. */
   struct nexthop_label *nh_label;
+#endif
 };
 
 extern int zebra_rnh_ip_default_route;
@@ -109,7 +115,9 @@ void nexthops_free (struct nexthop *nexthop);
 extern const char *nexthop_type_to_str (enum nexthop_types_t nh_type);
 extern int nexthop_same_no_recurse (struct nexthop *next1, struct nexthop *next2);
 
+#if defined(HAVE_MPLS)
 void nexthop_add_labels (struct nexthop *, u_int8_t, mpls_label_t *);
 void nexthop_del_labels (struct nexthop *);
+#endif
 
 #endif /*_LIB_NEXTHOP_H */

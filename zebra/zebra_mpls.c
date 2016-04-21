@@ -19,7 +19,10 @@
  * 02111-1307, USA.
  */
 
+
 #include <zebra.h>
+
+#if defined(HAVE_MPLS)
 
 #include "prefix.h"
 #include "table.h"
@@ -1757,3 +1760,5 @@ zebra_mpls_init (void)
 {
   mpls_processq_init (&zebrad);
 }
+
+#endif /* HAVE_MPLS */

@@ -1,4 +1,6 @@
 #include <zebra.h>
+
+#if defined(HAVE_MPLS)
 #include "nexthop.h"
 #include "zebra/rib.h"
 #include "zebra/zserv.h"
@@ -79,3 +81,4 @@ void
 zebra_mpls_init (void)
 {
 }
+#endif /* HAVE_MPLS */

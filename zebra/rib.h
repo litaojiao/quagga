@@ -29,7 +29,9 @@
 #include "queue.h"
 #include "nexthop.h"
 #include "vrf.h"
+#if defined(HAVE_MPLS)
 #include "mpls.h"
+#endif
 
 #define DISTANCE_INFINITY  255
 #define ZEBRA_KERNEL_TABLE_MAX 252 /* support for no more than this rt tables */
@@ -171,6 +173,7 @@ typedef struct rib_dest_t_
   RIB_DEST_FOREACH_ROUTE_SAFE (rib_dest_from_rnode (rn), rib, next)
 
 
+#if defined(HAVE_MPLS)
 /* Static route label information */
 struct static_nh_label
 {
@@ -178,6 +181,7 @@ struct static_nh_label
   u_int8_t reserved[3];
   mpls_label_t label[2];
 };
+#endif
 
 /* Static route information. */
 struct static_route
@@ -221,8 +225,10 @@ struct static_route
      ZEBRA_FLAG_BLACKHOLE
  */
 
+#if defined(HAVE_MPLS)
   /* Label information */
   struct static_nh_label snh_label;
+#endif
 };
 
 
@@ -371,6 +377,7 @@ struct zebra_vrf
    */
   struct zebra_ns *zns;
 
+#if defined(HAVE_MPLS)
   /* MPLS static LSP config table */
   struct hash *slsp_table;
 
@@ -380,6 +387,7 @@ struct zebra_vrf
   /* MPLS processing flags */
   u_int16_t mpls_flags;
 #define MPLS_FLAG_SCHEDULE_LSPS    (1 << 0)
+#endif
 };
 
 extern struct zebra_ns *dzns;
@@ -498,6 +506,7 @@ struct zebra_t;
 extern void rib_queue_add (struct zebra_t *zebra, struct route_node *rn);
 
 
+#if defined(HAVE_MPLS)
 extern int
 static_add_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
                  u_char flags, u_short tag, u_char distance, vrf_id_t vrf_id,
@@ -507,6 +516,15 @@ extern int
 static_delete_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
 		    u_short tag, u_char distance, vrf_id_t vrf_id,
                     struct static_nh_label *snh_label);
+#else
+extern int
+static_add_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
+                 u_char flags, u_short tag, u_char distance, vrf_id_t vrf_id);
+
+extern int
+static_delete_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
+		    u_short tag, u_char distance, vrf_id_t vrf_id);
+#endif
 
 extern int
 rib_add_ipv6 (int type, u_short instance, int flags, struct prefix_ipv6 *p,
@@ -524,25 +542,41 @@ extern struct rib *rib_match_ipv6 (struct in6_addr *, vrf_id_t);
 
 extern struct route_table *rib_table_ipv6;
 
+#if defined(HAVE_MPLS)
 extern int
 static_add_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
 		 unsigned int ifindex, u_char flags, u_short tag,
                  u_char distance, vrf_id_t vrf_id,
                  struct static_nh_label *snh_label);
+#else
+extern int
+static_add_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
+		 unsigned int ifindex, u_char flags, u_short tag,
+                 u_char distance, vrf_id_t vrf_id);
+#endif
 
 extern int
 rib_add_ipv6_multipath (struct prefix *, struct rib *, safi_t,
                         unsigned long);
 
+#if defined(HAVE_MPLS)
 extern int
 static_delete_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
 		    unsigned int ifindex, u_short tag, u_char distance,
                     vrf_id_t vrf_id, struct static_nh_label *snh_label);
+#else
+extern int
+static_delete_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
+		    unsigned int ifindex, u_short tag, u_char distance,
+                    vrf_id_t vrf_id);
+#endif
 
 extern int rib_gc_dest (struct route_node *rn);
 extern struct route_table *rib_tables_iter_next (rib_tables_iter_t *iter);
 
+#if defined(HAVE_MPLS)
 extern u_char route_distance(int type);
+#endif
 
 /*
  * Inline functions.

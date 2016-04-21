@@ -36,7 +36,9 @@
 #include "routemap.h"
 #include "nexthop.h"
 #include "vrf.h"
+#if defined(HAVE_MPLS)
 #include "mpls.h"
+#endif
 
 #include "zebra/rib.h"
 #include "zebra/rt.h"
@@ -47,7 +49,9 @@
 #include "zebra/zebra_rnh.h"
 #include "zebra/interface.h"
 #include "zebra/connected.h"
+#if defined(HAVE_MPLS)
 #include "zebra/zebra_mpls.h"
+#endif
 
 /* Default rtm_table for all clients */
 extern struct zebra_t zebrad;
@@ -81,6 +85,7 @@ static const struct
   /* no entry/default: 150 */
 };
 
+#if defined(HAVE_MPLS)
 u_char
 route_distance (int type)
 {
@@ -93,6 +98,7 @@ route_distance (int type)
 
   return distance;
 }
+#endif /* HAVE_MPLS */
 
 int
 is_zebra_valid_kernel_table(u_int32_t table_id)
@@ -163,9 +169,11 @@ rib_copy_nexthops (struct rib *rib, struct nexthop *nh)
   nexthop->ifindex = nh->ifindex;
   memcpy(&(nexthop->gate), &(nh->gate), sizeof(union g_addr));
   memcpy(&(nexthop->src), &(nh->src), sizeof(union g_addr));
+#if defined(HAVE_MPLS)
   if (nh->nh_label)
     nexthop_add_labels (nexthop, nh->nh_label->num_labels,
                         &nh->nh_label->label[0]);
+#endif
   rib_nexthop_add(rib, nexthop);
   if (CHECK_FLAG(nh->flags, NEXTHOP_FLAG_RECURSIVE))
     copy_nexthops(&nexthop->resolved, nh->resolved);
@@ -1694,6 +1702,7 @@ meta_queue_process_complete (struct work_queue *dummy)
         }
     }
 
+#if defined(HAVE_MPLS)
   /* Schedule LSPs for processing, if needed. */
   zvrf = vrf_info_lookup(VRF_DEFAULT);
   if (mpls_should_lsps_be_processed(zvrf))
@@ -1703,6 +1712,7 @@ meta_queue_process_complete (struct work_queue *dummy)
       zebra_mpls_lsp_schedule (zvrf);
       mpls_unmark_lsps_for_processing(zvrf);
     }
+#endif
 }
 
 /* Dispatch the meta queue by picking, processing and unlocking the next RN from
@@ -2613,10 +2623,12 @@ static_install_route (afi_t afi, safi_t safi, struct prefix *p, struct static_ro
 	  nexthop = rib_nexthop_ipv6_ifindex_add (rib, &si->addr.ipv6, si->ifindex);
 	  break;
         }
+#if defined(HAVE_MPLS)
       /* Update label(s), if present. */
       if (si->snh_label.num_labels)
         nexthop_add_labels (nexthop, si->snh_label.num_labels,
                             &si->snh_label.label[0]);
+#endif
 
       if (IS_ZEBRA_DEBUG_RIB)
         {
@@ -2624,8 +2636,8 @@ static_install_route (afi_t afi, safi_t safi, struct prefix *p, struct static_ro
           if (IS_ZEBRA_DEBUG_RIB)
             {
               inet_ntop (p->family, &p->u.prefix, buf, INET6_ADDRSTRLEN);
-              zlog_debug ("%u:%s/%d: Modifying route rn %p, rib %p (type %d)",
-                          si->vrf_id, buf, p->prefixlen, rn, rib, rib->type);
+              zlog_debug ("%u:%s/%d: Modifying route rn %p, rib %p (type %d) nexthop %p",
+                          si->vrf_id, buf, p->prefixlen, rn, rib, rib->type, nexthop);
             }
         }
       /* Schedule route for processing or invoke NHT, as appropriate. */
@@ -2675,10 +2687,12 @@ static_install_route (afi_t afi, safi_t safi, struct prefix *p, struct static_ro
 	  nexthop = rib_nexthop_ipv6_ifindex_add (rib, &si->addr.ipv6, si->ifindex);
 	  break;
         }
+#if defined(HAVE_MPLS)
       /* Update label(s), if present. */
       if (si->snh_label.num_labels)
         nexthop_add_labels (nexthop, si->snh_label.num_labels,
                             &si->snh_label.label[0]);
+#endif
 
       /* Save the flags of this static routes (reject, blackhole) */
       rib->flags = si->flags;
@@ -2689,8 +2703,8 @@ static_install_route (afi_t afi, safi_t safi, struct prefix *p, struct static_ro
           if (IS_ZEBRA_DEBUG_RIB)
             {
               inet_ntop (p->family, &p->u.prefix, buf, INET6_ADDRSTRLEN);
-              zlog_debug ("%u:%s/%d: Inserting route rn %p, rib %p (type %d)",
-                          si->vrf_id, buf, p->prefixlen, rn, rib, rib->type);
+              zlog_debug ("%u:%s/%d: Inserting route rn %p, rib %p (type %d) nexthop %p",
+                          si->vrf_id, buf, p->prefixlen, rn, rib, rib->type, nexthop);
             }
         }
       /* Link this rib to the tree. Schedule for processing or invoke NHT,
@@ -2707,6 +2721,7 @@ static_install_route (afi_t afi, safi_t safi, struct prefix *p, struct static_ro
     }
 }
 
+#if defined(HAVE_MPLS)
 static int
 static_nexthop_label_same (struct nexthop *nexthop,
                            struct static_nh_label *snh_label)
@@ -2727,6 +2742,7 @@ static_nexthop_label_same (struct nexthop *nexthop,
 
   return 1;
 }
+#endif /* HAVE_MPLS */
 
 static int
 static_nexthop_same (struct nexthop *nexthop, struct static_route *si)
@@ -2758,8 +2774,12 @@ static_nexthop_same (struct nexthop *nexthop, struct static_route *si)
   if (!gw_match)
     return 0;
 
+#if defined(HAVE_MPLS)
   /* Check match on label(s), if any */
   return static_nexthop_label_same (nexthop, &si->snh_label);
+#else
+  return 1;
+#endif
 }
 
 /* Uninstall static route from RIB. */
@@ -2867,10 +2887,16 @@ static_uninstall_route (afi_t afi, safi_t safi, struct prefix *p, struct static_
 }
 
 /* Add static route into static route configuration. */
+#if defined(HAVE_MPLS)
 int
 static_add_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
 		 u_char flags, u_short tag, u_char distance, vrf_id_t vrf_id,
                  struct static_nh_label *snh_label)
+#else
+int
+static_add_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
+		 u_char flags, u_short tag, u_char distance, vrf_id_t vrf_id)
+#endif
 {
   u_char type = 0;
   struct route_node *rn;
@@ -2902,8 +2928,11 @@ static_add_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
 	  && (! gate || IPV4_ADDR_SAME (gate, &si->addr.ipv4))
 	  && (! ifindex || ifindex == si->ifindex))
 	{
-	  if ((distance == si->distance) && (tag == si->tag) &&
-              !memcmp (&si->snh_label, snh_label, sizeof (struct static_nh_label)))
+	  if ((distance == si->distance) && (tag == si->tag)
+#if defined(HAVE_MPLS)
+              && !memcmp (&si->snh_label, snh_label, sizeof (struct static_nh_label))
+#endif
+             )
 	    {
 	      route_unlock_node (rn);
 	      return 0;
@@ -2915,8 +2944,12 @@ static_add_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
 
   /* Distance or tag or label changed, delete existing first. */
   if (update)
+#if defined(HAVE_MPLS)
     static_delete_ipv4 (p, gate, ifindex, update->tag, update->distance,
                         vrf_id, &update->snh_label);
+#else
+    static_delete_ipv4 (p, gate, ifindex, update->tag, update->distance, vrf_id);
+#endif
 
   /* Make new static route structure. */
   si = XCALLOC (MTYPE_STATIC_ROUTE, sizeof (struct static_route));
@@ -2931,8 +2964,10 @@ static_add_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
   if (gate)
     si->addr.ipv4 = *gate;
 
+#if defined(HAVE_MPLS)
   /* Save labels, if any. */
   memcpy (&si->snh_label, snh_label, sizeof (struct static_nh_label));
+#endif
 
   /* Add new static route information to the tree with sort by
      distance value and gateway address. */
@@ -2968,10 +3003,16 @@ static_add_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
 }
 
 /* Delete static route from static route configuration. */
+#if defined(HAVE_MPLS)
 int
 static_delete_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
 		    u_short tag, u_char distance, vrf_id_t vrf_id,
                     struct static_nh_label *snh_label)
+#else
+int
+static_delete_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex,
+		    u_short tag, u_char distance, vrf_id_t vrf_id)
+#endif
 {
   u_char type = 0;
   struct route_node *rn;
@@ -3002,8 +3043,11 @@ static_delete_ipv4 (struct prefix *p, struct in_addr *gate, unsigned int ifindex
 	&& (! gate || IPV4_ADDR_SAME (gate, &si->addr.ipv4))
 	&& (! ifindex || ifindex == si->ifindex)
 	&& (! tag || (tag == si->tag))
+#if defined(HAVE_MPLS)
         && (! snh_label->num_labels ||
-            !memcmp (&si->snh_label, snh_label, sizeof (struct static_nh_label))))
+            !memcmp (&si->snh_label, snh_label, sizeof (struct static_nh_label)))
+#endif
+       )
       break;
 
   /* Can't find static route. */
@@ -3396,11 +3440,18 @@ rib_delete_ipv6 (int type, u_short instance, int flags, struct prefix_ipv6 *p,
 }
 
 /* Add static route into static route configuration. */
+#if defined(HAVE_MPLS)
 int
 static_add_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
 		 unsigned int ifindex, u_char flags, u_short tag,
                  u_char distance, vrf_id_t vrf_id,
                  struct static_nh_label *snh_label)
+#else
+int
+static_add_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
+		 unsigned int ifindex, u_char flags, u_short tag,
+                 u_char distance, vrf_id_t vrf_id)
+#endif
 {
   struct route_node *rn;
   struct static_route *si;
@@ -3431,8 +3482,11 @@ static_add_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
 	  && (! gate || IPV6_ADDR_SAME (gate, &si->addr.ipv6))
 	  && (! ifindex || ifindex ==  si->ifindex))
 	{
-	  if ((distance == si->distance) && (tag == si->tag) &&
-              !memcmp (&si->snh_label, snh_label, sizeof (struct static_nh_label)))
+	  if ((distance == si->distance) && (tag == si->tag)
+#if defined(HAVE_MPLS)
+              && !memcmp (&si->snh_label, snh_label, sizeof (struct static_nh_label))
+#endif
+             )
 	    {
 	      route_unlock_node (rn);
 	      return 0;
@@ -3444,8 +3498,12 @@ static_add_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
 
   /* Distance or tag changed. */
   if (update)
+#if defined(HAVE_MPLS)
     static_delete_ipv6 (p, type, gate, ifindex, update->tag, update->distance,
                         vrf_id, &update->snh_label);
+#else
+    static_delete_ipv6 (p, type, gate, ifindex, update->tag, update->distance, vrf_id);
+#endif
 
   /* Make new static route structure. */
   si = XCALLOC (MTYPE_STATIC_ROUTE, sizeof (struct static_route));
@@ -3457,8 +3515,10 @@ static_add_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
   si->vrf_id = vrf_id;
   si->ifindex = ifindex;
 
+#if defined(HAVE_MPLS)
   /* Save labels, if any. */
   memcpy (&si->snh_label, snh_label, sizeof (struct static_nh_label));
+#endif
 
   switch (type)
     {
@@ -3497,10 +3557,17 @@ static_add_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
 }
 
 /* Delete static route from static route configuration. */
+#if defined(HAVE_MPLS)
 int
 static_delete_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
 		    unsigned int ifindex, u_short tag, u_char distance,
                     vrf_id_t vrf_id, struct static_nh_label *snh_label)
+#else
+int
+static_delete_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
+		    unsigned int ifindex, u_short tag, u_char distance,
+                    vrf_id_t vrf_id)
+#endif
 {
   struct route_node *rn;
   struct static_route *si;
@@ -3522,9 +3589,11 @@ static_delete_ipv6 (struct prefix *p, u_char type, struct in6_addr *gate,
 	&& type == si->type
 	&& (! gate || IPV6_ADDR_SAME (gate, &si->addr.ipv6))
 	&& (! ifindex || ifindex == si->ifindex)
+#if defined(HAVE_MPLS)
         && (! snh_label->num_labels ||
             !memcmp (&si->snh_label, snh_label,
                      sizeof (struct static_nh_label)))
+#endif
 	&& (! tag || (tag == si->tag)))
       break;
 
@@ -3801,7 +3870,9 @@ rib_close (void)
         rib_close_table (zvrf->other_table[AFI_IP6][table_id]);
     }
 
+#if defined(HAVE_MPLS)
   zebra_mpls_close_tables(zvrf);
+#endif
 
 }
 
@@ -3973,7 +4044,9 @@ zebra_vrf_alloc (vrf_id_t vrf_id, const char *name)
       zvrf->name[strlen(name)] = '\0';
     }
 
+#if defined(HAVE_MPLS)
   zebra_mpls_init_tables (zvrf);
+#endif
 
   return zvrf;
 }
