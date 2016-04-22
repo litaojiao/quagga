@@ -93,13 +93,12 @@ static const struct message nlmsg_str[] = {
 
 #ifndef NLMSG_TAIL
 #define NLMSG_TAIL(nmsg) \
-        ((struct rtattr *) ((nmsg) + NLMSG_ALIGN((nmsg)->nlmsg_len)))
+        ((struct rtattr *) (((u_char *) (nmsg)) + NLMSG_ALIGN((nmsg)->nlmsg_len)))
 #endif
 
 #ifndef RTA_TAIL
 #define RTA_TAIL(rta) \
-        ((struct rtattr *) ((rta) + RTA_ALIGN((rta)->rta_len)))
-
+        ((struct rtattr *) (((u_char *) (rta)) + RTA_ALIGN((rta)->rta_len)))
 #endif
 
 struct gw_family_t
@@ -1646,7 +1645,7 @@ addattr_nest(struct nlmsghdr *n, int maxlen, int type)
 static int
 addattr_nest_end(struct nlmsghdr *n, struct rtattr *nest)
 {
-  nest->rta_len = NLMSG_TAIL(n) - nest;
+  nest->rta_len = (u_char *)NLMSG_TAIL(n) - (u_char *)nest;
   return n->nlmsg_len;
 }
 
@@ -1662,7 +1661,7 @@ rta_nest(struct rtattr *rta, int maxlen, int type)
 static int
 rta_nest_end(struct rtattr *rta, struct rtattr *nest)
 {
-  nest->rta_len = RTA_TAIL(rta) - nest;
+  nest->rta_len = (u_char *)RTA_TAIL(rta) - (u_char *)nest;
   return rta->rta_len;
 }
 #endif /* HAVE_MPLS */
